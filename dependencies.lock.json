@@ -1,0 +1,234 @@
+{
+  "schema": 1,
+  "dependencies": {
+    "banjo_tooie_decomp": {
+      "kind": "git",
+      "directory": "banjo-tooie",
+      "url": "https://github.com/Mr-Wiseguy/banjo-tooie.git",
+      "commit": "25033be6ec9e35975483f064d086391d2381ca4c",
+      "recursive_submodules": true,
+      "submodules": {
+        "lib/ultralib": "97c8b26282730fcec7109035e79e60a5158a8e2c",
+        "tools/asm-processor": "8db39e1638bad6e532e664ffb8daa1e1abf96817",
+        "tools/elfio": "8ae6cec5d60495822ecd57d736f66149da9b1830",
+        "tools/fmt": "40626af88bd7df9a5fb80be7b25ac85b122d6c21",
+        "tools/rarezip": "e22df74bc9497db23e67062b98711362de023f7e",
+        "tools/splat": "78cf5dd483533eb22a6fc776d2e9b5d6c738fb61",
+        "tools/toml11": "be08ba2be2a964edcdb3d3e3ea8d100abc26f286",
+        "tools/toml11/docs/themes/hugo-book": "2f64607bc9a4caa6ffc4ed7f614c8ad9a5b6611c",
+        "tools/toml11/tests/extlib/doctest": "ae7a13539fb71f270b87eb2e874fbac80bc8dda2",
+        "tools/toml11/tests/extlib/json": "8c391e04fe4195d8be862c97f38cfe10e2a3472e"
+      }
+    },
+    "n64modernruntime": {
+      "kind": "git",
+      "directory": "N64ModernRuntime",
+      "url": "https://github.com/N64Recomp/N64ModernRuntime.git",
+      "commit": "ca568b6ad79b9029d14077f0c3ffa757727c5559",
+      "recursive_submodules": true,
+      "submodules": {
+        "N64Recomp": "2b6f05688de2abc7d86da5b4a89b84c2c6acbabe",
+        "N64Recomp/lib/ELFIO": "ad8b641f9682b6091ba8b9f7c8152255c1a2c803",
+        "N64Recomp/lib/fmt": "0e8aad961d66904cfda8d7cc894f6f6eee2d9f30",
+        "N64Recomp/lib/rabbitizer": "e0d8003047938e2ec3697eaf8d61a84d11d17b43",
+        "N64Recomp/lib/sljit": "f6326087b3404efb07c6d3deed97b3c3b8098c0c",
+        "N64Recomp/lib/tomlplusplus": "1f7884e59165e517462f922e7b6de131bd9844f3",
+        "thirdparty/miniz": "8573fd7cd6f49b262a0ccc447f3c6acfc415e556",
+        "thirdparty/o1heap": "a124b850791db2a33f7354d2b0aa7da821cef6f5",
+        "thirdparty/xxHash": "ac3a25da3d957d9ef3e4114d9f8332d34ce83a46"
+      }
+    },
+    "recomp_frontend": {
+      "kind": "git",
+      "directory": "RecompFrontend",
+      "url": "https://github.com/N64Recomp/RecompFrontend.git",
+      "commit": "d0d90ba49f46f4896aaeda362056c21b1e342561",
+      "recursive_submodules": true,
+      "submodules": {
+        "recompui/lib/RmlUi": "7a06f27db04fe5d13a5dacc19b2b4544673a4eca",
+        "recompui/lib/freetype-windows-binaries": "9124a2073f3a7055726be46bab1d54bf14f68f63",
+        "recompui/lib/lunasvg": "83c58df8103dc7dca423dfd824992af94d49bed6"
+      },
+      "reference_only": true
+    },
+    "rt64": {
+      "kind": "git",
+      "directory": "rt64",
+      "url": "https://github.com/rt64/rt64.git",
+      "commit": "6f1c2d99a4ea571c139f449c326fd176ba8f3496",
+      "recursive_submodules": true,
+      "submodules": {
+        "src/contrib/ddspp": "21ca0c4319dfd5a161c5f2a0c406e8f60194ea6c",
+        "src/contrib/dxc": "cc15e715ee378a4f675b335bd1071ff105873fc8",
+        "src/contrib/hlslpp": "6f5274c66132e8f951c400103d897582b8f21491",
+        "src/contrib/im3d": "d03941725fd0bd08c78c46e3e5b0265526e9d060",
+        "src/contrib/imgui": "277ae93c41314ba5f4c7444f37c4319cdf07e8cf",
+        "src/contrib/implot": "f156599faefe316f7dd20fe6c783bf87c8bb6fd9",
+        "src/contrib/mupen64plus-core": "860fac3fbae94194a392c1d9857e185eda6d083e",
+        "src/contrib/mupen64plus-win32-deps": "de8111fdcb89144abc16c85650ce4e21e028bfb5",
+        "src/contrib/nativefiledialog-extended": "17b6e8ce219c0677f94b63636abb9296b28841ca",
+        "src/contrib/plume": "d890ac899e505fb30040e037a4037cdeca68f033",
+        "src/contrib/plume/contrib/D3D12MemoryAllocator": "9ef66bc14edd10dee0de3a545b98578363552f66",
+        "src/contrib/plume/contrib/Vulkan-Headers": "2fa203425eb4af9dfc6b03f97ef72b0b5bcb8350",
+        "src/contrib/plume/contrib/VulkanMemoryAllocator": "29b35ea4232688c0f42cdff0c10848290760a417",
+        "src/contrib/plume/contrib/volk": "be3dbd49bf77052665e96b6c7484af855e7e5f67",
+        "src/contrib/re-spirv": "5d6b756ee62760f71b65d37e41a0b5a3dab90507",
+        "src/contrib/re-spirv/external/SPIRV-Headers": "f013f08e4455bcc1f0eed8e3dd5e2009682656d9",
+        "src/contrib/spirv-cross": "6173e24b31f09a0c3217103a130e74c4ddec14a6",
+        "src/contrib/stb": "ae721c50eaf761660b4f90cc590453cdb0c2acd0",
+        "src/contrib/xxHash": "1864a50c9b5cf8500d8e9e61ed92aa0dd3772750",
+        "src/contrib/zstd": "0ff651dd876823b99fa5c5f53292be28381aee9b"
+      }
+    },
+    "n64recomp_codegen": {
+      "kind": "git",
+      "directory": "N64Recomp-codegen",
+      "url": "https://github.com/N64Recomp/N64Recomp.git",
+      "commit": "ffb39cdad1da5de07eaaa48bd1db4a89a7986771",
+      "recursive_submodules": true,
+      "submodules": {
+        "lib/ELFIO": "ad8b641f9682b6091ba8b9f7c8152255c1a2c803",
+        "lib/fmt": "407c905e45ad75fc29bf0f9bb7c5c2fd3475976f",
+        "lib/rabbitizer": "e0d8003047938e2ec3697eaf8d61a84d11d17b43",
+        "lib/sljit": "f6326087b3404efb07c6d3deed97b3c3b8098c0c",
+        "lib/tomlplusplus": "1f7884e59165e517462f922e7b6de131bd9844f3"
+      }
+    },
+    "ido_53_linux": {
+      "kind": "archive",
+      "platform": "linux",
+      "directory": "codegen-tools/ido-5.3-recomp-linux",
+      "url": "https://github.com/decompals/ido-static-recomp/releases/download/v1.1/ido-5.3-recomp-linux.tar.gz",
+      "sha256": "34c4d46b8fbadcec6139a084979f18c8c2a533289ae59dd857443ec107e0ec76",
+      "archive_bytes": 4810948,
+      "strip_components": 0,
+      "source_repository": "https://github.com/decompals/ido-static-recomp.git",
+      "source_commit": "d6dd7fdea26cfe89dd01d7545618d4a9ae4f690a",
+      "license": "NOASSERTION; archive contains a static recompilation of proprietary SGI IDO; local tool acquisition only",
+      "files": {
+        "acpp": "ee1e48b27df53c3ccbf2a6d74ee576b1420f9636887290843edb72e2bd9871fc",
+        "as0": "e63d36eb37e78b91a5b37b775427118bf44435deb4d84f042ad5d9b7364557d4",
+        "as1": "2e2393759f36f196491d4370723fc10211092f281be49f9306bda75e6d87a483",
+        "c++filt": "094e2d79ef599fcca21acfaeb9793c288ca090c7147cccd945d0e859e47948dc",
+        "cc": "43f58f6c073dcfe8bcfbfd84ee69d5b346a079847eab561a41e04f98a4031b54",
+        "cfe": "95f8e848c9cc5da3d0ead124ae3c71cd63904ae19e95185216b3ed775e0b2047",
+        "copt": "9f8bdfbffd6b44d8fdd0713c7795ef30c616c392d087a3df1c5fd88316efe94b",
+        "crt1.o": "95bd24880e95e102bbdf2a1cfa2e10d391cb57784a42db19afd609c0904aee28",
+        "crtn.o": "62197e97a5e56e21c6a4e76ffe9f634cf90b47046ebe4841086108101ce496eb",
+        "err.english.cc": "6f2d777730f0a70328bb932c116c1c195da765cb9bbdee8c6d3eaf7d6ad77e78",
+        "ld": "b064d1eb8887197688b224d9d8d8177b754842f3d896a1aa59c8f04d499841b4",
+        "libc.so": "803f8b127194a79d92c5caea62fd39097be16d3fcd9870b4470123cebd5d27fe",
+        "libc.so.1": "803f8b127194a79d92c5caea62fd39097be16d3fcd9870b4470123cebd5d27fe",
+        "libexc.so": "b59bf75bcbff1526ad4e3b2b49b313788a6e4c97df5b69b4bc2ddbd6726c5864",
+        "libgen.so": "bb66dea1242000f648e890252cbe47037310559cc0ecda8ed212c0e545bf8063",
+        "libm.so": "8acc66c2d1315b90f38a280fe04a26d0e61b5ca377976ed5d7f88bb064bd2e35",
+        "strip": "6680d4c4ff54d1ce7a190a31706c343abdee46776cdc309d14ed2eb922759953",
+        "ugen": "47e98c9d6538a8e279d878faa1b0ab0e222adce758e625a9ee41135054697320",
+        "ujoin": "4b936ca9aaed59ab942a4f2851879856acde50f5ccfd1b1c7e05cf5b693ad55d",
+        "uld": "5f0c51e42d658de3d02f82f78d24c18f83300b387b7a37aa00017a0007ced93a",
+        "umerge": "c95c62cde7065f2a8cd4fbd6f1e380ea4e4622284f33e16104ba29b135aed18c",
+        "uopt": "6017dd61ac544547b357db2e1cd3abef317a778656a2999b3c6a0a8df8a8c9ff",
+        "upas": "dae6b1b945b71ad077b72c01db096b38f20079e6353739b2d0220afc882cbb34",
+        "usplit": "a0e5837f5ab00fb64d57d196ee9eb85a739eb540287a10cc98d9b9e45113acd2"
+      }
+    },
+    "mips_binutils_26_linux": {
+      "kind": "archive",
+      "platform": "linux",
+      "directory": "codegen-tools/mips-binutils-2.6-linux",
+      "url": "https://github.com/decompals/mips-binutils-2.6/releases/download/main/binutils-2.6-linux.tar.gz",
+      "sha256": "405a7ddb29a0b2eb472b167e8f15472223df1eff3093a5ff31d6e545d3a6c670",
+      "archive_bytes": 2086122,
+      "strip_components": 0,
+      "source_repository": "https://github.com/decompals/mips-binutils-2.6.git",
+      "source_commit": "9ffa763c22ed47678440f0c522145020e65cfae1",
+      "license": "GPL-2.0",
+      "files": {
+        "ar": "96832babb74c15cef08bb0996d44c9732e875538bb50a1cee26d5b04f1dd1247",
+        "as": "379806851d82f1234b2aed99c54acf9dcb27d7185102a7dabb20680bc25afb3a",
+        "objcopy": "9fdeca42934cfdb7b4d7a05e73e7312e0d91ffd05978761ea6e14fada79f40d0",
+        "strip": "c5e9f76639b4817dfadf52b48c40b5ef75644f8cc3edac57624f4fa6b36333da"
+      }
+    },
+    "mips_gcc_272_linux": {
+      "kind": "archive",
+      "platform": "linux",
+      "directory": "codegen-tools/mips-gcc-2.7.2-linux",
+      "url": "https://github.com/decompals/mips-gcc-2.7.2/releases/download/main/gcc-2.7.2-linux.tar.gz",
+      "sha256": "ff3e299c1d952c0a5cb39f7790a208d0c547cf93986eb5607f820c935cedc288",
+      "archive_bytes": 3445739,
+      "strip_components": 0,
+      "source_repository": "https://github.com/decompals/mips-gcc-2.7.2.git",
+      "source_commit": "feeaecf3c47943f186bd156ff29ff7e8f7fd5128",
+      "license": "GPL-2.0",
+      "files": {
+        "cc1": "c4976e94ebf81d0ab1336f631fb752fbe6e0e0810e90a24da11e6ed1d5223b8a",
+        "cc1plus": "22d5492f0414459776f7c3df819e1f7e56b62883e554d1fe78511ab764283d2d",
+        "cpp": "b2cf2ad691804021790c868319b7d5bbc6c8022ae965ee85703185553de498d5",
+        "g++": "f902b240563d1f244d70e35741166342e78ddfe64adfb9f218d9b7eb2a8fd508",
+        "gcc": "aef83ff8997d69c5ef16cabe0255526d6d7923ab0f557ca5207a25f396b1509e"
+      }
+    },
+    "mips_binutils_27_linux": {
+      "kind": "archive",
+      "platform": "linux",
+      "directory": "codegen-tools/mips-binutils-2.7-linux",
+      "url": "https://github.com/decompals/mips-binutils-2.7/releases/download/release/binutils-2.7.tar.gz",
+      "sha256": "7ea39839ed2c675c7ba46e6d1a67a9af5c9aa8215f7ccc0a6468c42855f01f6e",
+      "archive_bytes": 1157162,
+      "strip_components": 0,
+      "source_repository": "https://github.com/decompals/mips-binutils-2.7.git",
+      "source_commit": "479d38e081d6a6bd6b83f479491570aa0c74b60f",
+      "license": "GPL-2.0",
+      "files": {
+        "ar": "d3c87961c4768ab60a834c290c58ff878e04ced379dfa00627e87813b845ea9f",
+        "strip-2.7": "1b3bc1b09300789b47838ad2dc258cc940c106cbd31155a30ac7b3b1ff9fa671"
+      }
+    },
+    "dxc_windows": {
+      "kind": "archive",
+      "platform": "windows",
+      "directory": "DXC-v1.8.2502-Windows",
+      "url": "https://github.com/microsoft/DirectXShaderCompiler/releases/download/v1.8.2502/dxc_2025_02_20.zip",
+      "sha256": "70b1913a1bfce4a3e1a5311d16246f4ecdf3a3e613abec8aa529e57668426f85",
+      "archive_bytes": 26346851,
+      "strip_components": 0,
+      "source_repository": "https://github.com/microsoft/DirectXShaderCompiler",
+      "source_commit": "b4711839eb9a87da7c3436d9b212e0492359fbbd",
+      "license": "NCSA; see LICENSE-LLVM.txt in the official release",
+      "files": {
+        "bin/x64/dxc.exe": "ae4bf100b8c64ab03cdc0ee5996d5f212e96c59d6d37340359342d714ac6c004",
+        "bin/x64/dxcompiler.dll": "f79943b02f73b621421b58a569fd6ee120d0023fb6bfa23844ecad6b00d6a295",
+        "lib/x64/dxcompiler.lib": "c3ce5cab858f13dff3e1440471c48b29829ce0f43d0fe27525ef599a21562131"
+      }
+    },
+    "sdl2_windows": {
+      "kind": "archive",
+      "platform": "windows",
+      "directory": "SDL2-2.30.3",
+      "url": "https://github.com/libsdl-org/SDL/releases/download/release-2.30.3/SDL2-devel-2.30.3-VC.zip",
+      "sha256": "89999a6f3dc8f5e4fb03aaea6b4ad01747d9a81690f9f9a0674806e750483a38",
+      "strip_components": 1,
+      "files": {
+        "include/SDL.h": "9b44784b3728c508c9e5f875d59cbd6e791305838685f0bc706ab13faf529c2c",
+        "lib/x64/SDL2.dll": "68e36533f0184b533ec79aa01e835641a099880f63eaefe9425859574a739790",
+        "lib/x64/SDL2.lib": "593661df214c94252f73e6c2f226102d7a6d2cde36d7edfe7bca385c812c2afe"
+      }
+    },
+    "llvm_windows": {
+      "kind": "archive",
+      "platform": "windows",
+      "optional_group": "windows-toolchain",
+      "directory": "LLVM-19.1.3-Windows-X64",
+      "url": "https://github.com/llvm/llvm-project/releases/download/llvmorg-19.1.3/LLVM-19.1.3-Windows-X64.tar.xz",
+      "sha256": "1077267ca353a1e236055ed4b57d6a404d09c40b01bd27dc882870395cdc1aae",
+      "strip_components": 1,
+      "files": {
+        "bin/clang-cl.exe": "6ac72dac3eb54eb7f807b0c4428c8a61cf73fe77d00be8aec8bc07ab94cdcf23",
+        "bin/lld-link.exe": "91da6d00511f43b86c8f9800888e6c66939a864e860bfda6594c1c186fd97a77",
+        "bin/llvm-lib.exe": "428437f321aed236a3241e7f4c8c6a79ba4823ac6cf0ea89ce1d9f3b5f410cfe",
+        "bin/llvm-nm.exe": "80fc7944dffe4929dde0da55ad4ee1800bcf8b9b6ec8cb4b2d9e344f4fffe347"
+      }
+    }
+  }
+}

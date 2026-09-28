@@ -1,0 +1,99 @@
+{
+  "schema": 1,
+  "name": "rt64_projection_preservation",
+  "delta_revision": 3,
+  "upstream": {
+    "dependency": "rt64",
+    "commit": "6f1c2d99a4ea571c139f449c326fd176ba8f3496",
+    "path": "src/render/rt64_projection_processor.cpp",
+    "sha256": "cf04cb4da1bc39ab60cb24c92c0668385632ab7c6894157e6857c93252a39de9",
+    "lines": 163
+  },
+  "output": {
+    "filename": "rt64_projection_processor.cpp",
+    "sha256": "3cec637d6b29f9ed055dd36b652517e4284166997551fd32c6f81ce456ee0c45",
+    "lines": 215
+  },
+  "operations": [
+    {
+      "original_start": 72,
+      "original_end": 73,
+      "original_sha256": "5c48082241590d0237c39a0034ad109ae73c9172d954f2275e13fde4190d08e8",
+      "replacement_lines": [
+        "            // Scene matching can share the first projection's map with later\n",
+        "            // equal-camera draws. An explicit IGNORE group must still keep its\n",
+        "            // own current projection (notably CPU-skinned original-pose draws).\n",
+        "            const uint32_t projectionGroupIndex = drawData.viewProjTransformGroups[proj.transformsIndex];\n",
+        "            const bool originalProjection = drawData.transformGroups[projectionGroupIndex].matrixId == G_EX_ID_IGNORE;\n",
+        "            if ((p.prevFrame != nullptr) && workloadMap.mapped && !workload.debuggerCamera.enabled && !originalProjection) {\n"
+      ]
+    },
+    {
+      "original_start": 108,
+      "original_end": 110,
+      "original_sha256": "f01bf7e0fcf1b0f2c2e95feeaf5ae77e9fde2f70a8b08d0393b3ff2d901c75c3",
+      "replacement_lines": [
+        "            // Debugger camera.\n",
+        "            const bool debuggerCameraApplied = workload.debuggerCamera.enabled &&\n",
+        "                (proj.type == Projection::Type::Perspective) &&\n",
+        "                (workload.debuggerCamera.sceneIndex == sceneIndex);\n",
+        "            if (debuggerCameraApplied) {\n"
+      ]
+    },
+    {
+      "original_start": 142,
+      "original_end": 146,
+      "original_sha256": "dbcbecdedb913804e9db9d0a987ff37215d0fa0263582de1b9ff4fbe320a918b",
+      "replacement_lines": [
+        "            interop::float4x4 &prevViewProjTransform = drawData.prevViewProjTransforms[proj.transformsIndex];\n",
+        "            if (!debuggerCameraApplied &&\n",
+        "                ((prevProjMatrix == nullptr) || (prevViewMatrix == nullptr) || (rigidBody == nullptr))) {\n",
+        "                // The source projection may be a fixed 16.16 combined matrix.\n",
+        "                // Decomposing and recomposing it changes its depth coefficients\n",
+        "                // enough to move distant geometry past the far clip plane.\n",
+        "                // A horizontal aspect change only scales the combined X column.\n",
+        "                viewProjMatrix = drawData.viewProjTransforms[proj.transformsIndex];\n",
+        "                if (projRatioScale != 1.0f) {\n",
+        "                    adjustProjectionMatrix(viewProjMatrix, projRatioScale);\n",
+        "                }\n",
+        "                prevViewProjTransform = viewProjMatrix;\n",
+        "            }\n",
+        "            else {\n",
+        "                // Preserve the fixed-point combined-matrix residual at both\n",
+        "                // endpoints while retaining RT64's camera interpolation.\n",
+        "                viewProjMatrix = hlslpp::mul(viewMatrix, projMatrix);\n",
+        "                prevViewProjTransform = hlslpp::mul(prevViewTransform, prevProjTransform);\n",
+        "                if (!debuggerCameraApplied) {\n",
+        "                    const auto &viewProjMap = workloadMap.viewProjections[proj.transformsIndex];\n",
+        "                    const DrawData &prevDrawData = p.workloadQueue->workloads[workloadMap.prevWorkloadIndex].drawData;\n",
+        "                    interop::float4x4 curSource = drawData.viewProjTransforms[proj.transformsIndex];\n",
+        "                    interop::float4x4 prevSource = prevDrawData.viewProjTransforms[viewProjMap.prevTransformIndex];\n",
+        "                    adjustProjectionMatrix(curSource, projRatioScale);\n",
+        "                    adjustProjectionMatrix(prevSource, projRatioScale);\n",
+        "                    interop::float4x4 curProjSource = drawData.projTransforms[proj.transformsIndex];\n",
+        "                    interop::float4x4 prevProjSource = *prevProjMatrix;\n",
+        "                    adjustProjectionMatrix(curProjSource, projRatioScale);\n",
+        "                    adjustProjectionMatrix(prevProjSource, projRatioScale);\n",
+        "                    const interop::float4x4 curRecomposed = hlslpp::mul(drawData.viewTransforms[proj.transformsIndex], curProjSource);\n",
+        "                    const interop::float4x4 prevRecomposed = hlslpp::mul(*prevViewMatrix, prevProjSource);\n",
+        "                    // RT64 skips projection interpolation when the camera's\n",
+        "                    // translation and rotation are not interpolated. In that\n",
+        "                    // case both composed matrices use the current projection,\n",
+        "                    // so the residual must also come from the current frame.\n",
+        "                    const bool interpolateProjection = rigidBody->lerpTranslation || rigidBody->lerpRotation;\n",
+        "                    for (int row = 0; row < 4; row++) {\n",
+        "                        for (int col = 0; col < 4; col++) {\n",
+        "                            const float curResidual = curSource[row][col] - curRecomposed[row][col];\n",
+        "                            const float prevResidual = prevSource[row][col] - prevRecomposed[row][col];\n",
+        "                            viewProjMatrix[row][col] += interpolateProjection\n",
+        "                                ? prevResidual + (curResidual - prevResidual) * p.curFrameWeight : curResidual;\n",
+        "                            prevViewProjTransform[row][col] += interpolateProjection\n",
+        "                                ? prevResidual + (curResidual - prevResidual) * p.prevFrameWeight : curResidual;\n",
+        "                        }\n",
+        "                    }\n",
+        "                }\n",
+        "            }\n"
+      ]
+    }
+  ]
+}

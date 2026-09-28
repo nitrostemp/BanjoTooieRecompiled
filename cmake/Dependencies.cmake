@@ -1,0 +1,25 @@
+set(TOOIE_DEPS_ROOT "${CMAKE_SOURCE_DIR}/deps" CACHE PATH
+    "Repository-local dependency checkout created by tools/bootstrap_dependencies.py")
+get_filename_component(TOOIE_DEPS_ROOT "${TOOIE_DEPS_ROOT}" ABSOLUTE)
+set(RUNTIME_ROOT "${TOOIE_DEPS_ROOT}/N64ModernRuntime")
+set(RUNTIME_RECOMP_INCLUDE "${RUNTIME_ROOT}/N64Recomp/include")
+if(NOT EXISTS "${RUNTIME_ROOT}/CMakeLists.txt")
+    message(FATAL_ERROR
+        "Pinned N64ModernRuntime is missing at ${RUNTIME_ROOT}. "
+        "Run: python tools/bootstrap_dependencies.py")
+endif()
+find_package(Threads REQUIRED)
+if(NOT WIN32)
+    find_package(OpenSSL REQUIRED)
+endif()
+add_subdirectory("${RUNTIME_ROOT}" "${CMAKE_BINARY_DIR}/runtime")
+# Explicitly use one header version for every runtime and generated translation unit.
+target_include_directories(ultramodern PUBLIC "${RUNTIME_RECOMP_INCLUDE}")
+target_include_directories(librecomp PUBLIC "${RUNTIME_RECOMP_INCLUDE}")
+foreach(target librecomp ultramodern)
+    if(MSVC)
+        target_compile_options(${target} PRIVATE -fno-strict-aliasing)
+    else()
+        target_compile_options(${target} PRIVATE -fno-strict-aliasing -ffunction-sections -fdata-sections)
+    endif()
+endforeach()

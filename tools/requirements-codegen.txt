@@ -1,0 +1,22 @@
+# Frozen from the Step 0 Linux/WSL generator environment.
+certifi==2026.7.22
+charset-normalizer==3.5.1
+colorama==0.4.6
+decomp_settings==0.0.10
+idna==3.19
+intervaltree==3.2.1
+mapfile_parser==2.13.2
+n64img==0.3.3
+pyelftools==0.33
+pygfxd==1.0.5
+pylibyaml==0.1.0
+pypng==0.20220715.0
+PyYAML==6.0.3
+rabbitizer==1.16.2
+requests==2.34.2
+sortedcontainers==2.4.0
+spimdisasm==1.35.0
+toml==0.10.2
+tomli==2.2.1; python_version < "3.11"
+tqdm==4.70.1
+urllib3==2.8.0

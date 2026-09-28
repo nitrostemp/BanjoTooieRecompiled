@@ -1,0 +1,27 @@
+{
+  "schema": 1,
+  "name": "rt64_transform_upload_guard",
+  "delta_revision": 1,
+  "upstream": {
+    "dependency": "rt64",
+    "commit": "6f1c2d99a4ea571c139f449c326fd176ba8f3496",
+    "path": "src/render/rt64_transform_processor.cpp",
+    "sha256": "ffd56ba45e76a82c18397c4d777b228a2b0963ac28c6ba9c618b417437bebcf0",
+    "lines": 92
+  },
+  "output": {
+    "filename": "rt64_transform_processor.cpp",
+    "sha256": "757fd342eeb374c74109366e876ad708fc25c1a40882c9bf09167141a4310448",
+    "lines": 92
+  },
+  "operations": [
+    {
+      "original_start": 76,
+      "original_end": 77,
+      "original_sha256": "052642b7f358d4781e1c2173d098f28beb719c69d30c06c2b705dd4eb1b0abe7",
+      "replacement_lines": [
+        "            const bool prevFrameValid = (p.prevFrame != nullptr) && p.curFrame->frameMap.workloads[w].mapped;\n"
+      ]
+    }
+  ]
+}

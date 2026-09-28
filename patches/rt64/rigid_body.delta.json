@@ -1,0 +1,32 @@
+{
+  "schema": 1,
+  "name": "rt64_auto_translation_tolerance",
+  "delta_revision": 1,
+  "upstream": {
+    "dependency": "rt64",
+    "commit": "6f1c2d99a4ea571c139f449c326fd176ba8f3496",
+    "path": "src/hle/rt64_rigid_body.cpp",
+    "sha256": "b04a8571c9b2f5882ce41c501c95b9b30486e7cb11dcd999c60d1f4552155ac0",
+    "lines": 138
+  },
+  "output": {
+    "filename": "rt64_rigid_body.cpp",
+    "sha256": "8a4389ca0622127137f3d7e2f5cfa066dbafa4b578a1d91ed9117bbbf577b892",
+    "lines": 140
+  },
+  "operations": [
+    {
+      "original_start": 28,
+      "original_end": 32,
+      "original_sha256": "607c8aceb33e2ab0da8fd5fff4cdd1d42348bedfd6d4a31fbc9e93614f6b3f4c",
+      "replacement_lines": [
+        "            float curVelMag = hlslpp::length(curLinearVelocity);\n",
+        "            // Small movement is safe to interpolate even when its direction reverses.\n",
+        "            const bool smallDisplacement = curVelMag < VelocityTolerance;\n",
+        "            float dotCurVel = std::max(hlslpp::dot(linearVelocity / std::max(prevVelMag, Epsilon), curLinearVelocity / std::max(curVelMag, Epsilon))[0], Epsilon);\n",
+        "            curVelMag /= dotCurVel;\n",
+        "            lerpTranslation = smallDisplacement || (curVelMag / std::max(prevVelMag, Epsilon)) < MagnitudeThreshold;\n"
+      ]
+    }
+  ]
+}

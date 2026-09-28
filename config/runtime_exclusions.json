@@ -1,0 +1,21 @@
+[
+  "boot_osInitialize", "boot___osPiRawStartDma", "boot_osPiGetStatus",
+  "boot___osDisableInt", "boot___osRestoreInt", "boot___osSetSR", "boot___osGetSR",
+  "boot___osSetFpcCsr", "boot___osSiRawReadIo", "boot___osSiRawWriteIo",
+  "boot___osExceptionPreamble", "boot___osException", "boot_send_mesg", "boot_handle_CpU",
+  "boot___osEnqueueAndYield", "boot___osEnqueueThread", "boot___osPopThread",
+  "boot___osDispatchThread", "boot___osCleanupThread", "boot_osWritebackDCache",
+  "boot_osInvalICache", "boot_osUnmapTLBAll", "boot_osMapTLBRdb", "boot___ull_rshift",
+  "boot___ull_rem", "boot___ull_div", "boot___ll_lshift", "boot___ll_rem", "boot___ll_div",
+  "boot___ll_mul", "boot___ull_divremi", "boot___ll_mod", "boot___ll_rshift",
+  "boot___osGetCause", "boot_osCreatePiManager", "boot_osVirtualToPhysical",
+  "boot___osDequeueThread", "boot___osSiDeviceBusy", "boot_osSetEventMesg",
+  "boot_osSetIntMask", "boot_osDestroyThread", "boot_osCreateMesgQueue",
+  "boot___osPiCreateAccessQueue", "boot___osPiGetAccess", "boot___osPiRelAccess",
+  "boot_osGetThreadPri", "boot_osSetThreadPri", "boot___osEPiRawStartDma",
+  "boot_osCreateThread", "boot___osDevMgrMain", "boot_osStartThread", "boot___osProbeTLB",
+  "boot_osSendMesg", "boot_osRecvMesg", "boot___osResetGlobalIntMask",
+  "boot___osEPiRawWriteIo", "boot___osEPiRawReadIo", "boot___osSetGlobalIntMask",
+  "boot_osYieldThread", "func_8001DDC0", "ovl_entrypoint_alternate",
+  "tooie_core1_osInitialize"
+]

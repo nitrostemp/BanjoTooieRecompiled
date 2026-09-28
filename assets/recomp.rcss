@@ -1,0 +1,8 @@
+
+/* Banjo-Tooie launcher identity: warm parchment text on a deep teal field.
+   Layout and focus colors remain under RecompFrontend's accessible theme. */
+body {
+  font-family: "Inter Variable";
+  background-color: #071f26;
+  color: #f4e3ae;
+}

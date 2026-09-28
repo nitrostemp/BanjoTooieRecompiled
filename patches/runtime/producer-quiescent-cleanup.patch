@@ -1,0 +1,17 @@
+diff --git a/ultramodern/src/threads.cpp b/ultramodern/src/threads.cpp
+--- a/ultramodern/src/threads.cpp
++++ b/ultramodern/src/threads.cpp
+@@ -364,4 +364,13 @@ void ultramodern::cleanup_thread(UltraThreadContext *cur_context) {
+ 
+ void ultramodern::join_thread_cleaner_thread() {
+     thread_cleaner_thread.join();
++
++    // Caller must first stop every cleanup producer and wait for its native
++    // thread-exit notification. No new contexts may be enqueued during this drain.
++    // The cleaner can exit at its loop head with already queued contexts pending.
++    UltraThreadContext* to_delete;
++    while (deleted_threads.try_dequeue(to_delete)) {
++        to_delete->host_thread.join();
++        delete to_delete;
++    }
+ }

@@ -1,0 +1,36 @@
+{
+  "schema": 1,
+  "name": "rt64_matrix_trace",
+  "delta_revision": 1,
+  "upstream": {
+    "dependency": "rt64",
+    "commit": "6f1c2d99a4ea571c139f449c326fd176ba8f3496",
+    "path": "src/hle/rt64_workload_queue.cpp",
+    "sha256": "6e53030e8899c42347b51e67879fcb9679ad487ac067c192612c432d85bca4a4",
+    "lines": 1224
+  },
+  "output": {
+    "filename": "rt64_workload_queue.cpp",
+    "sha256": "fba4aa756f093fb3729afb40800874d9b5a3c64e2b9bc1319b6843516384a0c2",
+    "lines": 1227
+  },
+  "operations": [
+    {
+      "original_start": 5,
+      "original_end": 5,
+      "original_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "replacement_lines": [
+        "#include \"rt64_matrix_trace.hpp\"\n"
+      ]
+    },
+    {
+      "original_start": 336,
+      "original_end": 336,
+      "original_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "replacement_lines": [
+        "        tooieMatrixTraceFrame(*this, curFrame, prevFrame, curFrameWeight,\n",
+        "            prevFrameWeight, processProjections, processTransforms);\n"
+      ]
+    }
+  ]
+}

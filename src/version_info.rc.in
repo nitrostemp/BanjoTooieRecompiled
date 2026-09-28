@@ -1,0 +1,30 @@
+// Windows version resource; values come from the CMake project version.
+#include <winver.h>
+
+VS_VERSION_INFO VERSIONINFO
+FILEVERSION @PROJECT_VERSION_MAJOR@,@PROJECT_VERSION_MINOR@,@PROJECT_VERSION_PATCH@,0
+PRODUCTVERSION @PROJECT_VERSION_MAJOR@,@PROJECT_VERSION_MINOR@,@PROJECT_VERSION_PATCH@,0
+FILEFLAGSMASK VS_FFI_FILEFLAGSMASK
+FILEFLAGS @TOOIE_RC_FILEFLAGS@
+FILEOS VOS_NT_WINDOWS32
+FILETYPE VFT_APP
+FILESUBTYPE VFT2_UNKNOWN
+BEGIN
+    BLOCK "StringFileInfo"
+    BEGIN
+        BLOCK "040904B0"
+        BEGIN
+            VALUE "FileDescription", "Banjo-Tooie: Recompiled"
+            VALUE "FileVersion", "@TOOIE_ALPHA_VERSION@"
+            VALUE "InternalName", "TooieRecompiled"
+            VALUE "LegalCopyright", "Project material GPL-3.0-only; see LICENSE and THIRD_PARTY_NOTICES.md"
+            VALUE "OriginalFilename", "TooieRecompiled.exe"
+            VALUE "ProductName", "Banjo-Tooie: Recompiled"
+            VALUE "ProductVersion", "@TOOIE_ALPHA_VERSION@"
+        END
+    END
+    BLOCK "VarFileInfo"
+    BEGIN
+        VALUE "Translation", 0x0409, 1200
+    END
+END

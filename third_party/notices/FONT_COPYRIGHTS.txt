@@ -1,0 +1,32 @@
+Font metadata retained from the distributed font files
+====================================================
+
+assets/InterVariable.ttf
+------------------------
+Family: Inter Variable
+Copyright: Copyright 2016 The Inter Project Authors
+License description: This Font Software is licensed under the SIL Open Font
+License, Version 1.1. This license is available with a FAQ at:
+http://scripts.sil.org/OFL
+
+assets/NotoEmoji-Regular.ttf
+----------------------------
+Family: Noto Emoji
+Copyright: Copyright 2013 Google Inc. All Rights Reserved.
+License description: This Font Software is licensed under the SIL Open Font
+License, Version 1.1. This Font Software is distributed on an "AS IS" BASIS,
+WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. See
+the SIL Open Font License for the specific language, permissions and
+limitations governing your use of this Font Software.
+
+assets/promptfont/promptfont.ttf
+---------------------------------
+Family: PromptFont
+Copyright:
+Copyright 2018-2023, Yukari Hafner
+Copyright 2011-2016, Severin Meyer
+
+License description: SIL Open Font License 1.1
+
+The full SIL Open Font License 1.1 text is at SIL-OFL-1.1.txt. PromptFont's
+distributed LICENSE.txt and README.md are also retained beside its font file.

@@ -1,0 +1,11 @@
+#pragma once
+
+namespace tooie::build_identity {
+inline constexpr int major = @PROJECT_VERSION_MAJOR@;
+inline constexpr int minor = @PROJECT_VERSION_MINOR@;
+inline constexpr int patch = @PROJECT_VERSION_PATCH@;
+inline constexpr const char* suffix = "@TOOIE_ALPHA_SUFFIX@";
+inline constexpr const char* version = "@TOOIE_ALPHA_VERSION@";
+inline constexpr const char* revision_at_configure = "@TOOIE_GIT_REVISION@";
+inline constexpr const char* git_state_at_configure = "@TOOIE_GIT_STATE@";
+}

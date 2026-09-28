@@ -1,0 +1,36 @@
+[
+  {
+    "function": "func_80013B70",
+    "original_size": 12,
+    "size": 216,
+    "reason": "Entry jumps to shared tail at 0x80013B90 within func_80013B7C. Include the tail through its existing end at 0x80013C48; ROM instructions unchanged.",
+    "source": "banjo-tooie/asm/core1/1E2B200.s:372"
+  },
+  {
+    "function": "func_80013970",
+    "original_size": 0,
+    "size": 136,
+    "section": ".core1",
+    "vram": 2147563888,
+    "reason": "Existing nested glabel at 0x80013970 has no sized function in the dump. Its shared body ends at existing 0x800139F8. Add a sized entry; ROM instructions unchanged.",
+    "source": "banjo-tooie/asm/core1/1E2B200.s:218"
+  },
+  {
+    "function": "func_800136E4",
+    "original_size": 0,
+    "size": 68,
+    "section": ".core1",
+    "vram": 2147563236,
+    "reason": "Existing nested entry in func_800136D0; use its existing end at 0x80013728. ROM instructions unchanged.",
+    "source": "banjo-tooie/asm/core1/1E2B200.s:18"
+  },
+  {
+    "function": "func_800138D0",
+    "original_size": 0,
+    "size": 140,
+    "section": ".core1",
+    "vram": 2147563728,
+    "reason": "Existing nested entry in func_800138BC; use its existing end at 0x8001395C. ROM instructions unchanged.",
+    "source": "banjo-tooie/asm/core1/1E2B200.s:173"
+  }
+]

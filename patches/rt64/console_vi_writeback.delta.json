@@ -1,0 +1,35 @@
+{
+  "schema": 1,
+  "name": "rt64_console_vi_writeback",
+  "delta_revision": 1,
+  "upstream": {
+    "dependency": "rt64",
+    "commit": "6f1c2d99a4ea571c139f449c326fd176ba8f3496",
+    "path": "src/hle/rt64_state.cpp",
+    "sha256": "98464b469c2bdf7bb13e17bb204d41476250a23d82bba332a020e7962279ebc8",
+    "lines": 2804
+  },
+  "output": {
+    "filename": "rt64_state.cpp",
+    "sha256": "33cea405efccaa87e4f64c1e45ad4ecd8203660f0f3e020de3c66b7ef57dcaa4",
+    "lines": 2812
+  },
+  "operations": [
+    {
+      "original_start": 1944,
+      "original_end": 1945,
+      "original_sha256": "a1e02ec454aac7dadddf77ce14394f430bfab9ae637b21672e9c045c222296fe",
+      "replacement_lines": [
+        "                // A compatible tracked framebuffer already detected real CPU writes\n",
+        "                // above using RAMHash/uploadRAM and reports them as fbChangesMade.\n",
+        "                // Its changed raw bytes can also be our own fullSync GPU writeback.\n",
+        "                // Treating that as a second screen event presents the old VI buffer\n",
+        "                // before the guest swaps it, and contaminates the VI rate factors.\n",
+        "                // Keep raw-hash detection for untracked or uncovered VI memory;\n",
+        "                // VI changes and genuine tracked CPU updates still present normally.\n",
+        "                const bool trackedVIRange = (screenFb != nullptr) && (screenFb->RAMBytes >= screenFbBytes);\n",
+        "                screenChangesMade = !trackedVIRange && (newScreenHash != lastScreenHash);\n"
+      ]
+    }
+  ]
+}

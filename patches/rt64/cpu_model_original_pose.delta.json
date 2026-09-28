@@ -1,0 +1,61 @@
+{
+  "schema": 1,
+  "name": "rt64_cpu_model_original_pose",
+  "delta_revision": 2,
+  "upstream": {
+    "dependency": "rt64",
+    "commit": "6f1c2d99a4ea571c139f449c326fd176ba8f3496",
+    "path": "src/hle/rt64_rsp.cpp",
+    "sha256": "dc2c8b8d4c4a273e321a80d508c55064280b940472082eaeffc73409ce814c0e",
+    "lines": 1312
+  },
+  "output": {
+    "filename": "rt64_rsp.cpp",
+    "sha256": "2677551a8319d592cc49b5c516ba0541ea41114502d0821206ed6fe53d3c2dec",
+    "lines": 1324
+  },
+  "operations": [
+    {
+      "original_start": 5,
+      "original_end": 5,
+      "original_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "replacement_lines": [
+        "#include \"model_interpolation_rt64.hpp\"\n"
+      ]
+    },
+    {
+      "original_start": 470,
+      "original_end": 471,
+      "original_sha256": "a6c6d4f5db7d44b5aab0c5246ca25c04046873e2d1448d5fe1df523dd9b8675a",
+      "replacement_lines": [
+        "            drawData.viewProjTransformGroups.emplace_back(tooieOriginalPoseGroup(drawData,\n",
+        "                uint32_t(extended.curViewProjMatrixIdGroupIndex),\n",
+        "                modelMatrixPhysicalAddressStack[modelMatrixStackSize - 1]));\n"
+      ]
+    },
+    {
+      "original_start": 546,
+      "original_end": 547,
+      "original_sha256": "d9e7891b46d87db8e0ea21c885783128440e409315a52aa69fe995d7813cc368",
+      "replacement_lines": [
+        "            worldTransformGroups.emplace_back(tooieOriginalPoseGroup(workload.drawData,\n",
+        "                uint32_t(extended.curModelMatrixIdGroupIndex), physicalAddress));\n"
+      ]
+    },
+    {
+      "original_start": 552,
+      "original_end": 552,
+      "original_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "replacement_lines": [
+        "        // Keep a guarded CPU pose and its camera at the same guest time.\n",
+        "        // The next ordinary model restores the unmodified shared group.\n",
+        "        if (tooieOriginalPoseProjectionChanged(workload.drawData, curViewProjIndex,\n",
+        "            uint32_t(extended.curViewProjMatrixIdGroupIndex),\n",
+        "            modelMatrixPhysicalAddressStack[modelMatrixStackSize - 1])) {\n",
+        "            projectionMatrixChanged = true;\n",
+        "        }\n",
+        "\n"
+      ]
+    }
+  ]
+}

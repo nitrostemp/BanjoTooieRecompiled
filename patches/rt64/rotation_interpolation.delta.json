@@ -1,0 +1,50 @@
+{
+  "schema": 1,
+  "name": "rt64_rotation_interpolation",
+  "delta_revision": 1,
+  "upstream": {
+    "dependency": "rt64",
+    "commit": "6f1c2d99a4ea571c139f449c326fd176ba8f3496",
+    "path": "src/common/rt64_math.cpp",
+    "sha256": "d32abc9572001870b4144ffa49e832589858de0830dbb0d008761ad15a76364b",
+    "lines": 492
+  },
+  "output": {
+    "filename": "rt64_math.cpp",
+    "sha256": "56fdbe4bde360580678cae5af913998acff7daf6ee35d9108c09f61bd162e140",
+    "lines": 500
+  },
+  "operations": [
+    {
+      "original_start": 444,
+      "original_end": 460,
+      "original_sha256": "ee67f95b5378892f196cd1af49168cca083e8020cfb3667995527c7d64cb0221",
+      "replacement_lines": [
+        "            if (useSlerp) {\n",
+        "                // The pinned hlsl++ slerp reverses its endpoints and does not\n",
+        "                // use both spherical coefficients. Interpolate the shortest\n",
+        "                // quaternion arc with the same previous-to-current weight.\n",
+        "                const hlslpp::quaternion target = float(dot(a.rotation, b.rotation)) > 0.0f\n",
+        "                    ? b.rotation : -b.rotation;\n",
+        "                const float cosTheta = std::fmin(1.0f, std::fmax(0.0f, float(dot(a.rotation, target))));\n",
+        "                if (cosTheta >= 0.9995f) {\n",
+        "                    ret.rotation = lerp(a.rotation, target, weight);\n",
+        "                }\n",
+        "                else {\n",
+        "                    const float theta = std::acos(cosTheta);\n",
+        "                    const float invSinTheta = 1.0f / std::sin(theta);\n",
+        "                    const float previousFactor = std::sin((1.0f - weight) * theta) * invSinTheta;\n",
+        "                    const float currentFactor = std::sin(weight * theta) * invSinTheta;\n",
+        "                    ret.rotation = a.rotation * previousFactor + target * currentFactor;\n",
+        "                }\n",
+        "            }\n",
+        "            else if (float(dot(a.rotation, b.rotation)) > 0.0f) {\n",
+        "                ret.rotation = lerp(a.rotation, b.rotation, weight);\n",
+        "            }\n",
+        "            else {\n",
+        "                ret.rotation = lerp(a.rotation, -b.rotation, weight);\n",
+        "            }\n"
+      ]
+    }
+  ]
+}
