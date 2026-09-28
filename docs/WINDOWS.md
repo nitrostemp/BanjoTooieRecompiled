@@ -83,8 +83,8 @@ locked SDL2 binary, then writes `candidate-manifest.json` with the SHA-256 of
 every file. It does not publish anything:
 
 ```powershell
-python .	ools\package_windows_candidate.py
-python .	ools\package_windows_candidate.py --verify-only
+python .\tools\package_windows_candidate.py
+python .\tools\package_windows_candidate.py --verify-only
 ```
 
 Use `--refresh` to replace a previous candidate in place. A candidate's
