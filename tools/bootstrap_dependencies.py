@@ -110,7 +110,7 @@ def install_git(name: str, spec: dict[str, object], target: pathlib.Path) -> Non
 def download(url: str, destination: pathlib.Path) -> None:
     destination.parent.mkdir(parents=True, exist_ok=True)
     temporary = destination.with_suffix(destination.suffix + ".part")
-    request = urllib.request.Request(url, headers={"User-Agent": "BanjoTooieRecomp-bootstrap/1"})
+    request = urllib.request.Request(url, headers={"User-Agent": "BanjoTooieRecompiled-bootstrap/1"})
     with urllib.request.urlopen(request) as response, temporary.open("wb") as output:
         shutil.copyfileobj(response, output, length=1024 * 1024)
     temporary.replace(destination)

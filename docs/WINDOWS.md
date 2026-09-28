@@ -20,8 +20,8 @@ sudo apt-get install -y build-essential binutils-mips-linux-gnu gcc-mips-linux-g
 Clone the repository and fetch the pinned dependencies:
 
 ```powershell
-git clone https://github.com/some-scurvy-dog/BanjoTooieRecompiled.git BanjoTooieRecomp
-Set-Location .\BanjoTooieRecomp
+git clone https://github.com/some-scurvy-dog/BanjoTooieRecompiled.git
+Set-Location .\BanjoTooieRecompiled
 python .\tools\bootstrap_dependencies.py --with-windows-toolchain
 python .\tools\bootstrap_dependencies.py --with-windows-toolchain --verify
 ```
@@ -44,7 +44,7 @@ Place your own NTSC-U big-endian ROM at the ignored `baserom.us.z64` path. Confi
 Required hash: `9ec37fba6890362eba86fb855697a9cff1519275531b172083a1a6a045483583`. Stop if it differs. In Ubuntu/WSL, enter the same checkout through `/mnt/c` and run:
 
 ```bash
-cd /mnt/c/path/to/BanjoTooieRecomp
+cd /mnt/c/path/to/BanjoTooieRecompiled
 python3 tools/generate_local.py --rom baserom.us.z64 --jobs "$(nproc)"
 ```
 
@@ -90,3 +90,14 @@ python .	ools\package_windows_candidate.py --verify-only
 Use `--refresh` to replace a previous candidate in place. A candidate's
 `reviewStatus` stays `NOT_FOR_DISTRIBUTION` unless it is deliberately prepared
 with `--release` from a clean checkout whose build matches the current commit.
+
+### Comparing hashes
+
+The candidate manifest hashes the exact file bytes copied into the package,
+and its dependency-lock hash covers the local `dependencies.lock.json` used
+to prepare it. Git source archives contain committed bytes. Depending on Git's
+line-ending settings, a Windows working copy can use CRLF while the source
+archive uses LF, so their text-file hashes can differ. Verify package files
+against the package manifest without changing their line endings; compare a
+source archive against its named Git commit. A line-ending-only difference
+does not explain or excuse any other content difference.

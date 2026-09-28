@@ -40,9 +40,16 @@ Read [the Windows build guide](docs/WINDOWS.md) before setting up a development
 environment. [Code generation](docs/CODEGEN.md) describes the local generation
 inputs and [architecture](docs/ARCHITECTURE.md) gives an overview of the source
 tree. The project uses the user's own supported NTSC-U 1.0 ROM for local
-generation; the ROM and generated game material must never be committed or
-uploaded. Do not include build output, private profiles, saves, logs, captures
-or credentials in a contribution.
+generation. Do not commit the ROM, extracted game assets or generated game
+source/data, or attach them to issues or pull requests. Do not include build
+output, private profiles, saves, logs, captures or credentials in a contribution.
+
+Maintainer-prepared Windows packages are a separate process: the executable
+and the specific runtime metadata listed in `release/windows-files.json` are
+intentional package inputs. This is not permission to upload other generated
+files or a developer's build directory. A local candidate remains
+`NOT_FOR_DISTRIBUTION` until its exact contents are reviewed and approved for
+release. See [build metadata](docs/ARCHITECTURE.md#build-metadata).
 
 Run checks appropriate to the change. For code changes, build the affected
 target and run focused checks when available. For documentation changes, check

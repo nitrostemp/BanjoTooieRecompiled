@@ -78,7 +78,16 @@ executable rejects states saved by an earlier build.
 
 Build metadata is hashed and packaged beside the executable under
 `runtime-data/<identity>/`; the executable verifies it before use and reports it
-with `--build-metadata-info`. ROM bytes remain local; some metadata describes
-symbols/layout and must also be generated locally under the current upload
-policy. Native game execution must not depend on historical engineering
-directories.
+with `--build-metadata-info`. These files are generated locally and excluded
+from the source repository. The Windows candidate deliberately includes only
+the runtime configuration and core/overlay metadata listed in
+`release/windows-files.json`, alongside the translated executable. The metadata
+describes symbols and memory layouts; raw comparison bytes and extracted game
+images are excluded by `tools/prepare_build_metadata.py`. Players still supply
+their own ROM.
+
+The source/contribution exclusion and the package allowlist serve different
+purposes. Neither authorizes a public release: a candidate stays
+`NOT_FOR_DISTRIBUTION` until the exact package is approved. Other generated
+files, ROMs, saves and local build evidence must not be added to it. Native game
+execution must not depend on historical engineering directories.
