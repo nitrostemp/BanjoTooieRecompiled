@@ -5,14 +5,16 @@ through static recompilation, with rendering powered by
 [RT64](https://github.com/rt64/rt64). The game and assets are not included. You
 must provide your own supported copy of the game.
 
+[View screenshots](SCREENSHOTS.md)
+
 ## Alpha status
 
-A Windows x64 alpha is in preparation; no public download is available yet,
-and Apple Silicon/macOS and Linux builds are not ready.
+A Windows x64 alpha is available. Apple Silicon/macOS and Linux builds
+are not ready.
 
 ## Download and install
 
-When a reviewed Windows ZIP is made available, download it from the
+Download the Windows ZIP from the
 [project's Releases page](https://github.com/some-scurvy-dog/BanjoTooieRecompiled/releases),
 extract the entire ZIP to a folder, and keep its files together. Run
 `TooieRecompiled.exe` from that folder. There is no installer.
