@@ -11,6 +11,9 @@ namespace tooie::model_interpolation {
 struct MatrixRange {
     std::uint32_t begin = 0;
     std::uint32_t end = 0;
+    // Captured with the guest draw; the renderer must not infer scene state
+    // later, after this task may have crossed a scene boundary.
+    bool interpolate_camera = false;
 };
 
 inline constexpr std::size_t kMaxRangesPerTask = 128;
@@ -49,7 +52,11 @@ private:
 };
 
 bool original_pose_for_matrix(std::uint32_t physical_address) noexcept;
+bool original_pose_camera_interpolation_for_matrix(std::uint32_t physical_address) noexcept;
 Stats stats() noexcept;
 void reset() noexcept;
 
 } // namespace tooie::model_interpolation
+
+extern "C" void tooie_model_intro_draw_begin() noexcept;
+extern "C" void tooie_model_intro_draw_end() noexcept;

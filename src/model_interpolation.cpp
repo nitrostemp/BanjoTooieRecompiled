@@ -1,4 +1,8 @@
 #include "model_interpolation.hpp"
+#include "camera_interpolation.hpp"
+#include "scene_observer.hpp"
+#include "model_camera_policy.hpp"
+#include "replay_timing.hpp"
 
 #include "recomp.h"
 
@@ -31,6 +35,7 @@ struct Draw {
     std::uint64_t epoch = 0;
     bool valid = false;
     bool cpu_skinned = false;
+    bool intro_draw = false;
     bool trace = false;
 };
 struct GuestDrawStack {
@@ -39,6 +44,7 @@ struct GuestDrawStack {
     std::size_t overflow_depth = 0;
 };
 thread_local GuestDrawStack guest_draws;
+thread_local std::size_t intro_draw_depth = 0;
 thread_local const std::vector<MatrixRange>* active_task_ranges = nullptr;
 std::atomic_uint64_t current_epoch{1};
 
@@ -173,6 +179,7 @@ void model_draw_begin(std::uint8_t* rdram, recomp_context* ctx) noexcept {
     draw.scale_bits = static_cast<std::uint32_t>(ctx->r7);
     draw.depth = stack.depth;
     draw.epoch = current_epoch.load(std::memory_order_acquire);
+    draw.intro_draw = intro_draw_depth != 0;
     const std::uint32_t caller_sp = static_cast<std::uint32_t>(ctx->r29);
     read_word(rdram, draw.buffers, draw.display_list_start);
     draw.valid = read_word(rdram, draw.buffers + 4U, draw.matrix_start);
@@ -239,7 +246,24 @@ void model_draw_end(std::uint8_t* rdram, recomp_context* ctx) noexcept {
         disable_locked(true);
         return;
     }
-    pending[pending_count++] = {{begin_phys, end_phys}, gfx_begin_phys,
+    const auto scene = tooie::scene::snapshot();
+    const auto level = static_cast<std::uint8_t>(MEM_BU(0,
+        static_cast<gpr>(static_cast<std::int32_t>(0x8012762CU))));
+    const auto slot = static_cast<std::int8_t>(MEM_B(0,
+        static_cast<gpr>(static_cast<std::int32_t>(0x8012B3F1U))));
+    const auto game_type = static_cast<std::uint8_t>(MEM_BU(0,
+        static_cast<gpr>(static_cast<std::int32_t>(0x8012B3F2U))));
+    const auto frontend_mode = static_cast<std::uint8_t>(MEM_BU(0,
+        static_cast<gpr>(static_cast<std::int32_t>(0x80127760U))));
+    const bool ordinary_gameplay = interpolate_cpu_pose_camera({
+        .level = level, .save_slot = slot, .game_type = game_type,
+        .frontend_mode = frontend_mode,
+        .replay_record_available = tooie::replay_timing::frame_refresh_rate() != 0,
+        .map_available = scene.map_available,
+        .scene_activation = scene.activation_active,
+        .cutscene = tooie::camera_interpolation::cutscene_active(),
+        .title_character_draw = draw.intro_draw});
+    pending[pending_count++] = {{begin_phys, end_phys, ordinary_gameplay}, gfx_begin_phys,
         gfx_end_phys};
     ++range_stats.recorded_ranges;
     range_stats.pending_ranges = pending_count;
@@ -325,6 +349,21 @@ bool original_pose_for_matrix(std::uint32_t physical) noexcept {
     return false;
 }
 
+bool original_pose_camera_interpolation_for_matrix(std::uint32_t physical) noexcept {
+    const auto* ranges = active_task_ranges;
+    if (!ranges || physical >= rdram_size || physical > rdram_size - matrix_size)
+        return false;
+    bool found = false;
+    for (const MatrixRange& range : *ranges) {
+        if (physical >= range.begin && physical <= range.end - matrix_size &&
+            ((physical - range.begin) % matrix_size) == 0) {
+            if (!range.interpolate_camera) return false;
+            found = true;
+        }
+    }
+    return found;
+}
+
 Stats stats() noexcept {
     std::lock_guard lock(ranges_mutex);
     return range_stats;
@@ -348,6 +387,14 @@ extern "C" void tooie_model_draw_begin(std::uint8_t* rdram,
 
 extern "C" void tooie_model_draw_cpu_skinning() noexcept {
     tooie::model_interpolation::model_draw_cpu_skinning();
+}
+
+extern "C" void tooie_model_intro_draw_begin() noexcept {
+    ++intro_draw_depth;
+}
+
+extern "C" void tooie_model_intro_draw_end() noexcept {
+    if (intro_draw_depth != 0) --intro_draw_depth;
 }
 
 extern "C" void tooie_model_draw_end(std::uint8_t* rdram,

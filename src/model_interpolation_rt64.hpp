@@ -11,8 +11,14 @@ struct DrawData;
 uint32_t tooieOriginalPoseGroup(DrawData &data, uint32_t originalGroup,
     uint32_t physicalAddress);
 
-// CPU-skinned vertices kept at the current guest pose must use that guest
-// camera too. Split only their projection; leave the shared camera stack alone.
+// World and local CPU pose stay at the guest sample in either case. Ordinary
+// gameplay draws may keep the scene's smooth camera; title/cutscene draws use
+// the paired guest camera guard.
+uint32_t tooieOriginalPoseProjectionGroup(DrawData &data,
+    uint32_t originalGroup, uint32_t physicalAddress);
+
+// Split only a projection whose effective policy differs from the active one;
+// the next ordinary model restores the untouched shared camera stack.
 bool tooieOriginalPoseProjectionChanged(const DrawData &data,
     uint32_t projectionIndex, uint32_t originalGroup, uint32_t physicalAddress);
 }

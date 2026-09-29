@@ -7,6 +7,7 @@
 #include "platform_support.hpp"
 #include "profile_location.hpp"
 #include "runtime_save_root.hpp"
+#include "rt64_matrix_trace.hpp"
 #include "tooie_build_identity.hpp"
 
 #include "librecomp/game.hpp"
@@ -66,6 +67,7 @@ int tooie::frontend::run(const std::filesystem::path& profile_override,
     std::filesystem::create_directories(config_root);
     std::filesystem::create_directories(profile_root / "saves");
     std::filesystem::create_directories(log_root);
+    RT64::tooieScreenXTraceSetLogDirectory(log_root);
 
     auto session_log = std::make_shared<tooie::session_log::Writer>(log_root);
     process_exit_log = session_log;

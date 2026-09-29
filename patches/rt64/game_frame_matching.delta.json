@@ -1,7 +1,7 @@
 {
   "schema": 1,
   "name": "rt64_game_frame_matching",
-  "delta_revision": 6,
+  "delta_revision": 7,
   "upstream": {
     "dependency": "rt64",
     "commit": "6f1c2d99a4ea571c139f449c326fd176ba8f3496",
@@ -11,8 +11,8 @@
   },
   "output": {
     "filename": "rt64_game_frame.cpp",
-    "sha256": "9aa4972f571351c22499daf1a9cfd3e97e08d21dc689d5d87b53338da90139f6",
-    "lines": 1191
+    "sha256": "540d594eb1276f44e344294d90f0fbe829ecf507cf3f0262762915ef694727aa",
+    "lines": 1203
   },
   "operations": [
     {
@@ -22,7 +22,8 @@
       "replacement_lines": [
         "#include <algorithm>\n",
         "#include <array>\n",
-        "#include \"rt64_alias_coherence.hpp\"\n"
+        "#include \"rt64_alias_coherence.hpp\"\n",
+        "#include \"rt64_auto_match_policy.hpp\"\n"
       ]
     },
     {
@@ -286,6 +287,17 @@
         "            }\n",
         "            const hlslpp::float4x4 &curTransform = firstCurWorkload.drawData.worldTransforms[indices.first];\n",
         "            const hlslpp::float4x4 &prevTransform = firstPrevWorkload.drawData.worldTransforms[indices.second];\n",
+        "            const uint32_t prevGroupIndex = firstPrevWorkload.drawData.worldTransformGroups[indices.second];\n",
+        "            const TransformGroup &prevGroup = firstPrevWorkload.drawData.transformGroups[prevGroupIndex];\n",
+        "            const bool autoSkipQuad = tooie::rt64_match::guard_auto_skip_quad(\n",
+        "                curGroup.matrixId == G_EX_ID_AUTO && prevGroup.matrixId == G_EX_ID_AUTO,\n",
+        "                curGroup.vertexInterpolation == G_EX_COMPONENT_SKIP &&\n",
+        "                    prevGroup.vertexInterpolation == G_EX_COMPONENT_SKIP,\n",
+        "                firstCurWorkload.drawData.worldTransformVertexCount(indices.first),\n",
+        "                firstPrevWorkload.drawData.worldTransformVertexCount(indices.second));\n",
+        "            if (!tooie::rt64_match::allow_world_pair(autoSkipQuad,\n",
+        "                    curTransform[3][0], curTransform[3][1], curTransform[3][2],\n",
+        "                    prevTransform[3][0], prevTransform[3][1], prevTransform[3][2])) continue;\n",
         "            prevRigidBody = (firstPrevWorkloadMap != nullptr) ? &firstPrevWorkloadMap->transforms[indices.second].rigidBody : nullptr;\n",
         "\n",
         "            TransformMatchResult matchResult = computeTransformMatch(curTransform, firstCurViewProj, prevTransform, firstPrevViewProj, prevRigidBody);\n",

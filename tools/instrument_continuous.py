@@ -657,6 +657,45 @@ def apply_model_interpolation_hooks(text, source='<generated>'):
     return text.replace(body, updated, 1), 4
 
 
+def apply_intro_model_draw_hooks(text, source='<generated>'):
+    """Keep the measured title-character CPU poses on their paired guest camera.
+
+    The title renderer can execute with an existing save slot, so a slot/level
+    gameplay gate alone is insufficient to distinguish its camera-follow draws.
+    Mark only its three direct func_800DE448 calls and restore the thread-local
+    marker immediately afterward; the ordinary gameplay actor path is untouched.
+    """
+    matches = list(re.finditer(
+        r'RECOMP_FUNC void func_80803A78_chintrochar\([^\n]*\n.*?^;}\n', text, re.S | re.M))
+    if not matches:
+        return text, 0
+    if len(matches) != 1:
+        raise ValueError(f'{source}: duplicate title-character renderer')
+    body = matches[0][0]
+    updated = body
+    for pc in (0x80803C20, 0x80803C48, 0x80803CD4):
+        anchor = (f'    // 0x{pc:08X}: jal         0x800DE448\n')
+        if updated.count(anchor) != 1:
+            raise ValueError(f'{source}: changed title model call {pc:08X}')
+        call_start = updated.index(anchor)
+        call = '    func_800DE448(rdram, ctx);\n'
+        call_pos = updated.find(call, call_start)
+        if call_pos < 0 or call_pos - call_start > 250:
+            raise ValueError(f'{source}: changed title model call body {pc:08X}')
+        updated = (updated[:call_pos] +
+            '    tooie_model_intro_draw_begin();\n' +
+            '    func_800DE448(rdram, ctx);\n' +
+            '    tooie_model_intro_draw_end();\n' +
+            updated[call_pos + len(call):])
+    include = '#include "funcs.h"\n'
+    if text.count(include) != 1:
+        raise ValueError(f'{source}: unexpected generated include layout for title model')
+    text = text.replace(include, include +
+        'extern void tooie_model_intro_draw_begin(void);\n'
+        'extern void tooie_model_intro_draw_end(void);\n', 1)
+    return text.replace(body, updated, 1), 6
+
+
 def apply_scene_observer_hooks(text, source='<generated>'):
     """Observe Tooie's current map and bounded ordered activation calls."""
     count = 0
@@ -1385,6 +1424,7 @@ def instrument(directory, sections):
             'corrected_saved_ra_returns':[],'global_settings_observations':0,'widescreen_profile_hooks':0,'graphics_observations':0,'title_observations':0,'map_actor_list_observations':0,'menu_observations':0,'save_progress_pause_hooks':0,'game_feature_hooks':0,'first_person_analog_hooks':0,'free_camera_hooks':0,'camera_interpolation_hooks':0,'scene_observer_hooks':0,'guest_update_observers':0,'world_call_timing_hooks':0,'nested_scene_call_timing_hooks':0,'heap_realloc_safety_fixes':0,'game_delta_observers':0,'replay_timing_hooks':0,'native_aspect_hooks':0,'actor_draw_distance_hooks':0,'hud_counter_layout_hooks':0,'hud_counter_rect_hooks':0,'hud_ortho_hooks':0,'egg_reticle_ortho_hooks':0,'cutscene_skip_input_hooks':0,'music_volume_hooks':0}
     counts['practice_form_hooks']=0
     counts['model_interpolation_hooks']=0
+    counts['intro_model_draw_hooks']=0
     rewrites={
         '    ctx->r15 = MEM_W(ctx->r14, -0X4E0C);': '    ctx->r15 = tooie_uncached_word(rdram, (uint32_t)ADD32(ctx->r14, -0X4E0C));',
         '    ctx->r25 = MEM_W(ctx->r24, -0X1E40);': '    ctx->r25 = tooie_uncached_word(rdram, (uint32_t)ADD32(ctx->r24, -0X1E40));',
@@ -1420,6 +1460,8 @@ def instrument(directory, sections):
         counts['camera_interpolation_hooks']+=camera_interpolation_count
         text,model_interpolation_count=apply_model_interpolation_hooks(text,str(path))
         counts['model_interpolation_hooks']+=model_interpolation_count
+        text,intro_model_draw_count=apply_intro_model_draw_hooks(text,str(path))
+        counts['intro_model_draw_hooks']+=intro_model_draw_count
         text,scene_observer_count=apply_scene_observer_hooks(text,str(path))
         counts['scene_observer_hooks']+=scene_observer_count
         text,guest_update_count=apply_guest_update_observer(text,str(path))
@@ -1539,6 +1581,8 @@ def instrument(directory, sections):
     assert counts['camera_interpolation_hooks']==counts['expected_camera_interpolation_hooks'],counts
     counts['expected_model_interpolation_hooks']=4*int('func_800DE498' in addresses)
     assert counts['model_interpolation_hooks']==counts['expected_model_interpolation_hooks'],counts
+    counts['expected_intro_model_draw_hooks']=6*int('func_80803A78_chintrochar' in addresses)
+    assert counts['intro_model_draw_hooks']==counts['expected_intro_model_draw_hooks'],counts
     counts['expected_scene_observer_hooks']=int('func_800EA05C' in addresses)+12*int('func_800A72A4' in addresses)
     assert counts['scene_observer_hooks']==counts['expected_scene_observer_hooks'],counts
     counts['expected_guest_update_observers']=int('func_800A73F4' in addresses)

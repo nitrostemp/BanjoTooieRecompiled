@@ -55,7 +55,7 @@ endif()
 
 # The candidate version has one source of truth. Git provenance describes the
 # checkout when CMake configured; the session log also hashes the actual exe.
-set(TOOIE_ALPHA_SUFFIX "-alpha.1")
+set(TOOIE_ALPHA_SUFFIX "-alpha.2")
 set(TOOIE_ALPHA_VERSION "${PROJECT_VERSION}${TOOIE_ALPHA_SUFFIX}")
 execute_process(COMMAND git rev-parse --short=12 HEAD
     WORKING_DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}"
@@ -307,11 +307,19 @@ add_executable(hud_layout_state_test tests/hud_layout_state_test.cpp src/hud_lay
 target_include_directories(hud_layout_state_test PRIVATE src generated "${RUNTIME_RECOMP_INCLUDE}")
 target_compile_options(hud_layout_state_test PRIVATE -UNDEBUG)
 add_test(NAME hud_layout_state COMMAND hud_layout_state_test)
-add_executable(camera_interpolation_test tests/camera_interpolation_test.cpp src/camera_interpolation.cpp src/model_interpolation.cpp)
+add_executable(camera_interpolation_test tests/camera_interpolation_test.cpp src/camera_interpolation.cpp src/model_interpolation.cpp src/scene_observer.cpp)
 target_include_directories(camera_interpolation_test PRIVATE src generated "${RUNTIME_RECOMP_INCLUDE}")
 target_compile_options(camera_interpolation_test PRIVATE -UNDEBUG)
 target_link_libraries(camera_interpolation_test PRIVATE Threads::Threads)
 add_test(NAME camera_interpolation COMMAND camera_interpolation_test)
+add_executable(cpu_pose_camera_admission_test tests/cpu_pose_camera_admission_test.cpp)
+target_include_directories(cpu_pose_camera_admission_test PRIVATE src)
+target_compile_options(cpu_pose_camera_admission_test PRIVATE -UNDEBUG)
+add_test(NAME cpu_pose_camera_admission COMMAND cpu_pose_camera_admission_test)
+add_executable(rt64_auto_match_policy_test tests/rt64_auto_match_policy_test.cpp)
+target_include_directories(rt64_auto_match_policy_test PRIVATE src)
+target_compile_options(rt64_auto_match_policy_test PRIVATE -UNDEBUG)
+add_test(NAME rt64_auto_match_policy COMMAND rt64_auto_match_policy_test)
 add_executable(draw_distance_test tests/draw_distance_test.cpp src/draw_distance.cpp)
 target_include_directories(draw_distance_test PRIVATE src)
 target_compile_options(draw_distance_test PRIVATE -UNDEBUG)

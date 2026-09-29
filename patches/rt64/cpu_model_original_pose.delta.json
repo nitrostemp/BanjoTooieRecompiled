@@ -11,7 +11,7 @@
   },
   "output": {
     "filename": "rt64_rsp.cpp",
-    "sha256": "2677551a8319d592cc49b5c516ba0541ea41114502d0821206ed6fe53d3c2dec",
+    "sha256": "155e2b3170d97e71cc2a5e05c511339e73a63d83c5ccc98049abbf2d1182fa4e",
     "lines": 1324
   },
   "operations": [
@@ -28,7 +28,7 @@
       "original_end": 471,
       "original_sha256": "a6c6d4f5db7d44b5aab0c5246ca25c04046873e2d1448d5fe1df523dd9b8675a",
       "replacement_lines": [
-        "            drawData.viewProjTransformGroups.emplace_back(tooieOriginalPoseGroup(drawData,\n",
+        "            drawData.viewProjTransformGroups.emplace_back(tooieOriginalPoseProjectionGroup(drawData,\n",
         "                uint32_t(extended.curViewProjMatrixIdGroupIndex),\n",
         "                modelMatrixPhysicalAddressStack[modelMatrixStackSize - 1]));\n"
       ]

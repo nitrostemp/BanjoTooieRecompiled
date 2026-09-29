@@ -63,6 +63,10 @@ void set_cutscene_active(bool active) noexcept {
         cutscene_state.fetch_and(~cutscene_active_bit, std::memory_order_acq_rel);
 }
 
+bool cutscene_active() noexcept {
+    return (cutscene_state.load(std::memory_order_acquire) & cutscene_active_bit) != 0;
+}
+
 bool bind_task(std::uint32_t display_list) noexcept {
     std::lock_guard lock(binding_mutex);
     if (binding_stats.disabled) {

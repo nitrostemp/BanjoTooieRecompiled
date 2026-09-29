@@ -1,6 +1,7 @@
 #pragma once
 
 #include "hle/rt64_workload_queue.h"
+#include "rt64_auto_match_policy.hpp"
 
 #include <algorithm>
 #include <cstdint>
@@ -97,6 +98,16 @@ inline void tooieRepairSourceMatrixAliases(WorkloadQueue &queue, GameFrame &fram
                     donorMap.prevTransformIndex >= prevData.worldTransforms.size()) {
                     ambiguous = true;
                     break;
+                }
+                if (curData.worldTransformVertexCount(uint32_t(target)) == 4) {
+                    const auto &current = curData.worldTransforms[target];
+                    const auto &previous = prevData.worldTransforms[donorMap.prevTransformIndex];
+                    if (!tooie::rt64_match::allow_world_pair(true,
+                            current[3][0], current[3][1], current[3][2],
+                            previous[3][0], previous[3][1], previous[3][2])) {
+                        ambiguous = true;
+                        break;
+                    }
                 }
                 if (chosen == count) {
                     chosen = donor;
