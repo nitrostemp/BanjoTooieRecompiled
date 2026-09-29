@@ -8,10 +8,17 @@
 #include <cmath>
 #include <cstdio>
 #include <cstdlib>
+#include <fstream>
 #include <string_view>
 
 namespace RT64 {
 namespace {
+
+std::atomic<uint32_t> screenXTraceArm{0};
+std::filesystem::path screenXTraceDirectory;
+std::ofstream screenXTraceFile;
+size_t screenXTraceBytes = 0;
+constexpr size_t screenXTraceByteCap = 4U << 20;
 
 float maxAbsDifference(const hlslpp::float4x4 &a, const hlslpp::float4x4 &b,
     int firstColumn = 0) noexcept {
@@ -82,6 +89,137 @@ uint32_t worldGroupId(const DrawData &data, uint32_t matrixIndex) noexcept {
     if (matrixIndex >= data.worldTransformGroups.size()) return 0;
     const uint32_t groupIndex = data.worldTransformGroups[matrixIndex];
     return groupIndex < data.transformGroups.size() ? data.transformGroups[groupIndex].matrixId : 0;
+}
+
+void traceScreenX(const WorkloadQueue &queue, const GameFrame &frame,
+    uint32_t call, float weight, bool projectionsProcessed,
+    bool transformsProcessed) noexcept {
+    if (!screenXTraceFile || call >= 420 || call % 7 != 0) return;
+
+    // Compare the same current vertices under all four matrix combinations.
+    // This distinguishes a world-history mismatch from a camera-history
+    // mismatch without assuming that an AUTO matrix identifies an object.
+    for (uint32_t w : frame.workloads) {
+        if (w >= queue.workloads.size()) continue;
+        const Workload &workload = queue.workloads[w];
+        const DrawData &data = workload.drawData;
+        const auto *workloadMap = w < frame.frameMap.workloads.size()
+            ? &frame.frameMap.workloads[w] : nullptr;
+        const uint64_t previousWorkloadId = workloadMap && workloadMap->mapped &&
+            workloadMap->prevWorkloadIndex < queue.workloads.size()
+            ? queue.workloads[workloadMap->prevWorkloadIndex].workloadId : 0;
+        const uint32_t matrixLimit = uint32_t(std::min<size_t>(
+            data.worldTransforms.size(), 256));
+        for (uint32_t m = 0; m < matrixLimit; ++m) {
+            if (m >= data.worldTransformVertexIndices.size()) continue;
+            const size_t first = data.worldTransformVertexIndices[m];
+            const size_t count = data.worldTransformVertexCount(m);
+            if (!count || first > data.vertexCount() || count > data.vertexCount() - first)
+                continue;
+            const auto &rawWorld = data.worldTransforms[m];
+            const auto &finalWorld = transformsProcessed && m < data.lerpWorldTransforms.size()
+                ? data.lerpWorldTransforms[m] : rawWorld;
+            double sumX[4]{}, sumY[4]{};
+            uint32_t samples = 0;
+            uint32_t projection = UINT32_MAX;
+            bool mixedProjection = false;
+            const size_t stride = std::max<size_t>(1, count / 32);
+            for (size_t v = first; v < first + count; v += stride) {
+                if (v >= data.worldIndices.size() || data.worldIndices[v] != m ||
+                    v >= data.viewProjIndices.size() || v * 3 + 2 >= data.posFloats.size())
+                    continue;
+                const uint32_t p = data.viewProjIndices[v];
+                if (p >= data.viewProjTransforms.size() || p >= data.rspViewports.size())
+                    continue;
+                if (projection != UINT32_MAX && p != projection) {
+                    mixedProjection = true;
+                    continue;
+                }
+                const auto &rawProjection = data.viewProjTransforms[p];
+                const auto &finalProjection = projectionsProcessed &&
+                    p < data.modViewProjTransforms.size()
+                    ? data.modViewProjTransforms[p] : rawProjection;
+                const auto &viewport = data.rspViewports[p];
+                const size_t offset = v * 3;
+                const hlslpp::float4 rawLocal(data.posFloats[offset],
+                    data.posFloats[offset + 1], data.posFloats[offset + 2], 1.0f);
+                auto finalLocal = rawLocal;
+                if (offset + 2 < data.velFloats.size())
+                    finalLocal -= hlslpp::float4(data.velFloats[offset],
+                        data.velFloats[offset + 1], data.velFloats[offset + 2], 0.0f)
+                        * (1.0f - weight);
+                const hlslpp::float4 points[4] = {
+                    hlslpp::mul(hlslpp::mul(rawLocal, rawWorld), rawProjection),
+                    hlslpp::mul(hlslpp::mul(finalLocal, finalWorld), finalProjection),
+                    hlslpp::mul(hlslpp::mul(finalLocal, finalWorld), rawProjection),
+                    hlslpp::mul(hlslpp::mul(rawLocal, rawWorld), finalProjection)
+                };
+                bool valid = true;
+                for (const auto &point : points)
+                    valid &= std::isfinite(float(point.w)) &&
+                        std::fabs(float(point.w)) > 0.0001f;
+                if (!valid) continue;
+                double xs[4]{}, ys[4]{};
+                for (uint32_t kind = 0; kind < 4; ++kind) {
+                    xs[kind] = double(viewport.translate.x) +
+                        double(viewport.scale.x) * double(points[kind].x) /
+                            double(points[kind].w);
+                    ys[kind] = double(viewport.translate.y) -
+                        double(viewport.scale.y) * double(points[kind].y) /
+                            double(points[kind].w);
+                    if (!std::isfinite(xs[kind]) || !std::isfinite(ys[kind])) {
+                        valid = false; break;
+                    }
+                }
+                if (!valid) continue;
+                for (uint32_t kind = 0; kind < 4; ++kind) {
+                    sumX[kind] += xs[kind];
+                    sumY[kind] += ys[kind];
+                }
+                projection = p;
+                ++samples;
+            }
+            if (!samples) continue;
+            const auto *map = workloadMap && workloadMap->mapped &&
+                m < workloadMap->transforms.size()
+                ? &workloadMap->transforms[m] : nullptr;
+            const uint32_t physical = m < data.worldTransformPhysicalAddresses.size()
+                ? data.worldTransformPhysicalAddresses[m] : 0;
+            const auto *projectionMap = workloadMap && workloadMap->mapped &&
+                projection < workloadMap->viewProjections.size()
+                ? &workloadMap->viewProjections[projection] : nullptr;
+            const uint32_t projectionGroup = projection < data.viewProjTransformGroups.size()
+                ? data.viewProjTransformGroups[projection] : UINT32_MAX;
+            const uint32_t projectionGroupId = projectionGroup < data.transformGroups.size()
+                ? data.transformGroups[projectionGroup].matrixId : UINT32_MAX;
+            char line[512];
+            const int length = std::snprintf(line, sizeof(line),
+                "%u,%.5f,%llu,%llu,%u,%u,%u,%08x,%08x,%08x,%zu,%u,%u,%u,%u,%u,%u,"
+                "%.4f,%.4f,%.4f,%.4f,%.4f,%.4f,%.4f,%.4f,%.4g,%.4g,%.4g\n",
+                call, weight, static_cast<unsigned long long>(workload.workloadId),
+                static_cast<unsigned long long>(previousWorkloadId), w, m, projection,
+                worldGroupId(data, m), projectionGroupId, physical,
+                count, samples, unsigned(mixedProjection),
+                unsigned(map && map->mapped),
+                map && map->mapped ? map->prevTransformIndex : UINT32_MAX,
+                unsigned(projectionMap && projectionMap->mapped),
+                projectionMap && projectionMap->mapped
+                    ? projectionMap->prevTransformIndex : UINT32_MAX,
+                sumX[0] / samples, sumY[0] / samples,
+                sumX[1] / samples, sumY[1] / samples,
+                sumX[2] / samples, sumY[2] / samples,
+                sumX[3] / samples, sumY[3] / samples,
+                float(rawWorld[3][0]), float(rawWorld[3][1]),
+                float(rawWorld[3][2]));
+            if (length <= 0 || size_t(length) >= sizeof(line) ||
+                size_t(length) > screenXTraceByteCap - screenXTraceBytes) {
+                screenXTraceFile.close();
+                return;
+            }
+            screenXTraceFile.write(line, length);
+            screenXTraceBytes += size_t(length);
+        }
+    }
 }
 
 void traceTriangleEdges(const WorkloadQueue &queue, const GameFrame &frame,
@@ -378,9 +516,48 @@ void traceWorldDetails(const WorkloadQueue &queue, const GameFrame &curFrame,
 
 } // namespace
 
+void tooieScreenXTraceSetLogDirectory(const std::filesystem::path &directory) noexcept {
+    try { screenXTraceDirectory = directory; }
+    catch (...) { screenXTraceDirectory.clear(); }
+}
+
+void tooieScreenXTraceArm() noexcept {
+    screenXTraceArm.fetch_add(1, std::memory_order_release);
+}
+
 void tooieMatrixTraceFrame(const WorkloadQueue &queue, const GameFrame &curFrame,
     const GameFrame &prevFrame, float curFrameWeight, float prevFrameWeight,
     bool projectionsProcessed, bool transformsProcessed) noexcept {
+    static uint32_t screenArmSeen = 0;
+    static uint32_t screenCalls = 420;
+    const uint32_t screenArm = screenXTraceArm.load(std::memory_order_acquire);
+    if (screenArm != screenArmSeen) {
+        screenArmSeen = screenArm;
+        screenCalls = 0;
+        screenXTraceFile.close();
+        screenXTraceBytes = 0;
+        if (screenArm <= 4 && !screenXTraceDirectory.empty()) {
+            try {
+                screenXTraceFile.open(screenXTraceDirectory /
+                    ("screen-xy-trace-" + std::to_string(screenArm) + ".csv"),
+                    std::ios::out | std::ios::trunc);
+                if (screenXTraceFile) {
+                    constexpr char header[] = "sample,weight,workload_id,previous_workload_id,slot,"
+                        "world,projection,world_group,projection_group,physical,vertices,sampled,"
+                        "mixed_projection,world_mapped,previous_world,projection_mapped,previous_projection,"
+                        "raw_x,raw_y,final_x,final_y,model_x,model_y,camera_x,camera_y,"
+                        "world_tx,world_ty,world_tz\n";
+                    screenXTraceFile.write(header, sizeof(header) - 1);
+                    screenXTraceBytes = sizeof(header) - 1;
+                }
+            } catch (...) { screenXTraceFile.close(); }
+        }
+    }
+    if (screenCalls < 420)
+        traceScreenX(queue, curFrame, screenCalls++, curFrameWeight,
+            projectionsProcessed, transformsProcessed);
+    if (screenCalls == 420 && screenXTraceFile)
+        screenXTraceFile.close();
     static const bool logoTrace = [] {
         const char* value = std::getenv("TOOIE_LOGO_TRACE");
         return value && std::string_view(value) == "1";

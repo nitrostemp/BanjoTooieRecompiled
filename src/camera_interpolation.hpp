@@ -54,6 +54,7 @@ void request_skip() noexcept;
 void configure_cutscene_motion(CutsceneMotion motion) noexcept;
 CutsceneMotion configured_cutscene_motion() noexcept;
 void set_cutscene_active(bool active) noexcept;
+bool cutscene_active() noexcept;
 
 // Bind a pending request to the exact graphics display list at the original
 // submit_rsp_task boundary, then consume it only for that list in send_dl.

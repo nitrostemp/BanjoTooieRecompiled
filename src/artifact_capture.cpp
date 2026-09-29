@@ -1,4 +1,5 @@
 #include "artifact_capture.hpp"
+#include "rt64_matrix_trace.hpp"
 
 #include "hle/rt64_state.h"
 #include "hle/rt64_workload_queue.h"
@@ -199,6 +200,7 @@ bool call_match_hash(const RT64::Workload& workload, const RT64::DrawCall& call,
 
 void request() noexcept {
     pending_tasks.store(kTasksPerRequest, std::memory_order_release);
+    RT64::tooieScreenXTraceArm();
 }
 
 bool try_claim() noexcept {

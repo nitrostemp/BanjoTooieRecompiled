@@ -11,12 +11,22 @@ bool tooieOriginalPoseProjectionChanged(const DrawData &data,
         originalGroup >= data.transformGroups.size()) return false;
     const uint32_t activeGroup = data.viewProjTransformGroups[projectionIndex];
     if (activeGroup >= data.transformGroups.size()) return false;
-    const bool originalPose = physicalAddress != 0 &&
-        tooie::model_interpolation::original_pose_for_matrix(physicalAddress);
-    // The CPU clone has IGNORE/all-SKIP, preserving aspect and viewport policy.
-    // Returning to an ordinary model reselects the exact shared stack group.
-    return originalPose ? data.transformGroups[activeGroup].matrixId != G_EX_ID_IGNORE
+    const bool pairedCamera = physicalAddress != 0 &&
+        tooie::model_interpolation::original_pose_for_matrix(physicalAddress) &&
+        !tooie::model_interpolation::original_pose_camera_interpolation_for_matrix(
+            physicalAddress);
+    // The paired CPU clone has IGNORE/all-SKIP. Gameplay CPU draws and the
+    // following ordinary draw reselect the exact shared camera group.
+    return pairedCamera ? data.transformGroups[activeGroup].matrixId != G_EX_ID_IGNORE
                         : activeGroup != originalGroup;
+}
+
+uint32_t tooieOriginalPoseProjectionGroup(DrawData &data,
+    uint32_t originalGroup, uint32_t physicalAddress) {
+    if (physicalAddress != 0 &&
+        tooie::model_interpolation::original_pose_camera_interpolation_for_matrix(
+            physicalAddress)) return originalGroup;
+    return tooieOriginalPoseGroup(data, originalGroup, physicalAddress);
 }
 
 uint32_t tooieOriginalPoseGroup(DrawData &data, uint32_t originalGroup,

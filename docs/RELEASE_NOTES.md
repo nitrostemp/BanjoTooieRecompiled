@@ -1,12 +1,27 @@
-# Release notes — Windows alpha 0.1.0-alpha.1
+# Release notes — Windows alpha 0.1.0-alpha.2
 
-These notes describe the Windows x64 alpha. The exact version is shown on the
-launcher's About page, and the package's `candidate-manifest.json` lists the
-SHA-256 of every file it contains.
+These notes describe the Windows x64 Alpha 2 ZIP release. The exact version is
+shown on the launcher's About page, and the package's
+`candidate-manifest.json` lists the SHA-256 of every file it contains. The
+[Alpha 1 release](https://github.com/some-scurvy-dog/BanjoTooieRecompiled/releases/tag/v0.1.0-alpha.1)
+remains available for reference.
 
 Banjo-Tooie Recompiled is a native Windows game made through static
 recompilation, with RT64 rendering. You must supply your own supported game
 ROM. Neither the ROM nor extracted game assets are included.
+
+## What's new in Alpha 2
+
+Fixed camera-motion jitter affecting characters, fire and ground buttons in
+gameplay. Also fixed ground-button jitter in recorded **Press Start** attract
+demos. These fixes were verified in the reported scenes with **Custom / Display
+/ Present Early**; they are not a claim about every scene or PC.
+
+Alpha 2 keeps Alpha 1's launcher, controls, graphics options, ordinary saves
+and Private Practice features. Existing saves, settings, controls and selected
+ROM remain in `%LOCALAPPDATA%\BanjoTooieRecompiled`. Back up your `saves`
+folder before updating. Private Practice states depend on the exact build and
+settings; start a fresh practice session and create a new checkpoint in Alpha 2.
 
 ## Requirements and installation
 
@@ -78,7 +93,7 @@ state slot requires the same build, ROM, gameplay settings and render settings;
 an update may invalidate a saved state. After changing builds, make a fresh
 practice checkpoint.
 
-This version stores its profile in `%LOCALAPPDATA%\BanjoTooieRecompiled`. On
+The application stores its profile in `%LOCALAPPDATA%\BanjoTooieRecompiled`. On
 first start it copies a profile from the earlier `TooieRecomp-frontend` folder
 and leaves the original unchanged; see the player guide for details.
 
