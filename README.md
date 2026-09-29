@@ -7,6 +7,8 @@ must provide your own supported copy of the game.
 
 [View screenshots](SCREENSHOTS.md)
 
+[YouTube channel](https://www.youtube.com/@some-scurvy-dog)
+
 ## Alpha status
 
 A Windows x64 alpha is available. Apple Silicon/macOS and Linux builds
