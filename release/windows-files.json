@@ -1,7 +1,7 @@
 {
   "schema": 2,
   "candidateVersion": "0.1.0-alpha.3",
-  "releaseApproval": null,
+  "releaseApproval": "0.1.0-alpha.3",
   "reviewRule": "Package exactly these paths. README.md is built from release/README.player.md; {identity} resolves from the build's metadata selection. releaseApproval stays null until the owner approves this exact version for distribution.",
   "files": [
     "TooieRecompiled.exe",
