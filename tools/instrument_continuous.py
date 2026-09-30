@@ -610,6 +610,39 @@ def apply_camera_interpolation_hook(text, source='<generated>'):
     return text.replace(body, updated, 1), 1
 
 
+def apply_camera_pod_recreation_hook(text, source='<generated>'):
+    """Reset projection history after ncpod has replaced a camera allocation.
+
+    ncpod_entrypoint_12 first tears down the active dialog/ucam/fixed-position
+    camera, then initializes the selected replacement. L_80800684 is reached
+    only after one of those three replacement handles was stored. It is not the
+    ordinary active-camera setter, which legitimately changes during a frame.
+    """
+    matches = list(re.finditer(
+        r'RECOMP_FUNC void ncpod_entrypoint_12\([^\n]*\n.*?^;}\n', text,
+        re.S | re.M))
+    if not matches:
+        return text, 0
+    if len(matches) != 1:
+        raise ValueError(f'{source}: duplicate ncpod camera recreation function')
+    body = matches[0][0]
+    if 'tooie_camera_interpolation_request_skip' in body:
+        raise ValueError(f'{source}: ncpod camera recreation hook already present')
+    matches = list(re.finditer(
+        r'(L_80800684:\n(?:(?!L_80800688:).)*?'
+        r'ctx->r31 = MEM_W\(ctx->r29, 0X1C\);\n)', body, re.S))
+    if len(matches) != 1:
+        raise ValueError(f'{source}: changed ncpod post-creation convergence')
+    updated = body[:matches[0].end()] + \
+        '    tooie_camera_interpolation_request_skip();\n' + body[matches[0].end():]
+    include = '#include "funcs.h"\n'
+    if text.count(include) != 1:
+        raise ValueError(f'{source}: unexpected generated include layout for ncpod camera')
+    text = text.replace(include, include +
+        'extern void tooie_camera_interpolation_request_skip(void);\n', 1)
+    return text.replace(body, updated, 1), 1
+
+
 def apply_model_interpolation_hooks(text, source='<generated>'):
     """Observe one original model draw and its actual CPU-skinning calls.
 
@@ -644,7 +677,15 @@ def apply_model_interpolation_hooks(text, source='<generated>'):
             raise ValueError(f'{source}: changed CPU-skinning call {pc:08X}')
         updated = updated.replace(anchor, anchor.replace(
             f'    {call}(rdram, ctx);\n',
-            f'    tooie_model_draw_cpu_skinning();\n    {call}(rdram, ctx);\n'), 1)
+            f'    tooie_model_draw_cpu_skinning(rdram, ctx);\n    {call}(rdram, ctx);\n'), 1)
+    frustum_anchor = (
+        '    // 0x800DE6E8: mfc1        $a1, $f4\n'
+        '    ctx->r5 = (int32_t)ctx->f4.u32l;\n'
+        '    // 0x800DE6EC: jal         0x800E3E8C\n')
+    if updated.count(frustum_anchor) != 1:
+        raise ValueError(f'{source}: changed model frustum-sphere call')
+    updated = updated.replace(frustum_anchor, frustum_anchor +
+        '    tooie_nest_visibility_expand(ctx);\n', 1)
     updated = updated.replace(exit_label, exit_label +
         '    tooie_model_draw_end(rdram, ctx);\n', 1)
     include = '#include "funcs.h"\n'
@@ -652,9 +693,45 @@ def apply_model_interpolation_hooks(text, source='<generated>'):
         raise ValueError(f'{source}: unexpected generated include layout for model interpolation')
     text = text.replace(include, include +
         'extern void tooie_model_draw_begin(uint8_t*, recomp_context*);\n'
-        'extern void tooie_model_draw_cpu_skinning(void);\n'
+        'extern void tooie_model_draw_cpu_skinning(uint8_t*, recomp_context*);\n'
         'extern void tooie_model_draw_end(uint8_t*, recomp_context*);\n', 1)
-    return text.replace(body, updated, 1), 4
+    text = text.replace('extern void tooie_model_draw_end(uint8_t*, recomp_context*);\n',
+        'extern void tooie_model_draw_end(uint8_t*, recomp_context*);\n'
+        'extern void tooie_nest_visibility_expand(recomp_context*);\n', 1)
+    return text.replace(body, updated, 1), 5
+
+
+def apply_nest_visibility_hooks(text, source='<generated>'):
+    """Pass the initialized nest child radius to its immediate body draw.
+
+    The source wrapper func_800DE448 always enters func_800DE498.  A one-shot
+    marker therefore needs no cross-call scope or yield-sensitive cleanup.
+    """
+    matches = list(re.finditer(
+        r'RECOMP_FUNC void func_80800898_chnests\([^\n]*\n.*?^;}\n', text,
+        re.S | re.M))
+    if not matches:
+        return text, 0
+    if len(matches) != 1:
+        raise ValueError(f'{source}: duplicate nest body renderer')
+    body = matches[0][0]
+    if 'tooie_nest_body_draw_begin' in body:
+        raise ValueError(f'{source}: nest visibility hook already present')
+    anchor = '    // 0x80800920: jal         0x800DE448\n'
+    if body.count(anchor) != 1:
+        raise ValueError(f'{source}: changed nest body model-call anchor')
+    call = '    func_800DE448(rdram, ctx);\n'
+    anchor_pos = body.index(anchor)
+    call_pos = body.find(call, anchor_pos)
+    if call_pos < 0 or call_pos - anchor_pos > 512:
+        raise ValueError(f'{source}: changed nest body model-call body')
+    updated = body[:call_pos] + '    tooie_nest_body_draw_begin(rdram, ctx);\n' + body[call_pos:]
+    include = '#include "funcs.h"\n'
+    if text.count(include) != 1:
+        raise ValueError(f'{source}: unexpected generated include layout for nest body')
+    text = text.replace(include, include +
+        'extern void tooie_nest_body_draw_begin(uint8_t*, recomp_context*);\n', 1)
+    return text.replace(body, updated, 1), 1
 
 
 def apply_intro_model_draw_hooks(text, source='<generated>'):
@@ -694,6 +771,46 @@ def apply_intro_model_draw_hooks(text, source='<generated>'):
         'extern void tooie_model_intro_draw_begin(void);\n'
         'extern void tooie_model_intro_draw_end(void);\n', 1)
     return text.replace(body, updated, 1), 6
+
+
+def apply_backpack_model_draw_hooks(text, source='<generated>'):
+    """Bracket the one PlayerState-owned backpack renderer call.
+
+    babackpack_entrypoint_3 supplies its PlayerState in s0 and invokes the
+    generic model renderer exactly once. The persistent-continuation lifter
+    recognizes this adjacent bracket and closes it before its generated yield
+    check, so it cannot leak into a resumed guest continuation. This includes
+    the selected backpack contents model.
+    """
+    matches = list(re.finditer(
+        r'RECOMP_FUNC void babackpack_entrypoint_3\([^\n]*\n.*?^;}\n', text,
+        re.S | re.M))
+    if not matches:
+        return text, 0
+    if len(matches) != 1:
+        raise ValueError(f'{source}: duplicate backpack renderer')
+    body = matches[0][0]
+    if 'tooie_model_backpack_draw_' in body:
+        raise ValueError(f'{source}: backpack model hooks already present')
+    anchor = '    // 0x808003FC: jal         0x800DE448\n'
+    if body.count(anchor) != 1:
+        raise ValueError(f'{source}: changed backpack model call anchor')
+    call = '    func_800DE448(rdram, ctx);\n'
+    anchor_pos = body.index(anchor)
+    call_pos = body.find(call, anchor_pos)
+    if call_pos < 0 or call_pos - anchor_pos > 512:
+        raise ValueError(f'{source}: changed backpack model call body')
+    updated = body[:call_pos] + (
+        '    tooie_model_backpack_draw_begin((uint32_t)ctx->r16);\n'
+        '    func_800DE448(rdram, ctx);\n'
+        '    tooie_model_backpack_draw_end();\n') + body[call_pos + len(call):]
+    include = '#include "funcs.h"\n'
+    if text.count(include) != 1:
+        raise ValueError(f'{source}: unexpected generated include layout for backpack model')
+    text = text.replace(include, include +
+        'extern void tooie_model_backpack_draw_begin(uint32_t);\n'
+        'extern void tooie_model_backpack_draw_end(void);\n', 1)
+    return text.replace(body, updated, 1), 2
 
 
 def apply_scene_observer_hooks(text, source='<generated>'):
@@ -1424,7 +1541,10 @@ def instrument(directory, sections):
             'corrected_saved_ra_returns':[],'global_settings_observations':0,'widescreen_profile_hooks':0,'graphics_observations':0,'title_observations':0,'map_actor_list_observations':0,'menu_observations':0,'save_progress_pause_hooks':0,'game_feature_hooks':0,'first_person_analog_hooks':0,'free_camera_hooks':0,'camera_interpolation_hooks':0,'scene_observer_hooks':0,'guest_update_observers':0,'world_call_timing_hooks':0,'nested_scene_call_timing_hooks':0,'heap_realloc_safety_fixes':0,'game_delta_observers':0,'replay_timing_hooks':0,'native_aspect_hooks':0,'actor_draw_distance_hooks':0,'hud_counter_layout_hooks':0,'hud_counter_rect_hooks':0,'hud_ortho_hooks':0,'egg_reticle_ortho_hooks':0,'cutscene_skip_input_hooks':0,'music_volume_hooks':0}
     counts['practice_form_hooks']=0
     counts['model_interpolation_hooks']=0
+    counts['nest_visibility_hooks']=0
     counts['intro_model_draw_hooks']=0
+    counts['backpack_model_draw_hooks']=0
+    counts['camera_pod_recreation_hooks']=0
     rewrites={
         '    ctx->r15 = MEM_W(ctx->r14, -0X4E0C);': '    ctx->r15 = tooie_uncached_word(rdram, (uint32_t)ADD32(ctx->r14, -0X4E0C));',
         '    ctx->r25 = MEM_W(ctx->r24, -0X1E40);': '    ctx->r25 = tooie_uncached_word(rdram, (uint32_t)ADD32(ctx->r24, -0X1E40));',
@@ -1458,10 +1578,16 @@ def instrument(directory, sections):
         counts['free_camera_hooks']+=free_camera_count
         text,camera_interpolation_count=apply_camera_interpolation_hook(text,str(path))
         counts['camera_interpolation_hooks']+=camera_interpolation_count
+        text,camera_pod_recreation_count=apply_camera_pod_recreation_hook(text,str(path))
+        counts['camera_pod_recreation_hooks']+=camera_pod_recreation_count
         text,model_interpolation_count=apply_model_interpolation_hooks(text,str(path))
         counts['model_interpolation_hooks']+=model_interpolation_count
+        text,nest_visibility_count=apply_nest_visibility_hooks(text,str(path))
+        counts['nest_visibility_hooks']+=nest_visibility_count
         text,intro_model_draw_count=apply_intro_model_draw_hooks(text,str(path))
         counts['intro_model_draw_hooks']+=intro_model_draw_count
+        text,backpack_model_draw_count=apply_backpack_model_draw_hooks(text,str(path))
+        counts['backpack_model_draw_hooks']+=backpack_model_draw_count
         text,scene_observer_count=apply_scene_observer_hooks(text,str(path))
         counts['scene_observer_hooks']+=scene_observer_count
         text,guest_update_count=apply_guest_update_observer(text,str(path))
@@ -1579,8 +1705,10 @@ def instrument(directory, sections):
     assert counts['free_camera_hooks']==counts['expected_free_camera_hooks'],counts
     counts['expected_camera_interpolation_hooks']=int('func_800E42B4' in addresses)
     assert counts['camera_interpolation_hooks']==counts['expected_camera_interpolation_hooks'],counts
-    counts['expected_model_interpolation_hooks']=4*int('func_800DE498' in addresses)
+    counts['expected_model_interpolation_hooks']=5*int('func_800DE498' in addresses)
     assert counts['model_interpolation_hooks']==counts['expected_model_interpolation_hooks'],counts
+    counts['expected_nest_visibility_hooks']=int('func_80800898_chnests' in addresses)
+    assert counts['nest_visibility_hooks']==counts['expected_nest_visibility_hooks'],counts
     counts['expected_intro_model_draw_hooks']=6*int('func_80803A78_chintrochar' in addresses)
     assert counts['intro_model_draw_hooks']==counts['expected_intro_model_draw_hooks'],counts
     counts['expected_scene_observer_hooks']=int('func_800EA05C' in addresses)+12*int('func_800A72A4' in addresses)

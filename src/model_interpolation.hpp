@@ -2,6 +2,7 @@
 
 #include <cstddef>
 #include <cstdint>
+#include <filesystem>
 #include <vector>
 
 namespace tooie::model_interpolation {
@@ -14,6 +15,9 @@ struct MatrixRange {
     // Captured with the guest draw; the renderer must not infer scene state
     // later, after this task may have crossed a scene boundary.
     bool interpolate_camera = false;
+    // Explicit task-bound ID for a verified moving CPU actor's single root.
+    // Zero preserves the original-pose policy.
+    std::uint32_t root_id = 0;
 };
 
 inline constexpr std::size_t kMaxRangesPerTask = 128;
@@ -52,11 +56,19 @@ private:
 };
 
 bool original_pose_for_matrix(std::uint32_t physical_address) noexcept;
+std::uint32_t original_pose_root_id_for_matrix(std::uint32_t physical_address) noexcept;
 bool original_pose_camera_interpolation_for_matrix(std::uint32_t physical_address) noexcept;
 Stats stats() noexcept;
 void reset() noexcept;
+
+// Optional F4 diagnostic. The caller supplies the existing profile log directory;
+// drawing and task submission remain unchanged if the file cannot be opened.
+void set_trace_directory(const std::filesystem::path& directory) noexcept;
+void arm_trace() noexcept;
 
 } // namespace tooie::model_interpolation
 
 extern "C" void tooie_model_intro_draw_begin() noexcept;
 extern "C" void tooie_model_intro_draw_end() noexcept;
+extern "C" void tooie_model_backpack_draw_begin(std::uint32_t owner) noexcept;
+extern "C" void tooie_model_backpack_draw_end() noexcept;

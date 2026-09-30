@@ -145,7 +145,8 @@ std::array<bool, count> last_utility_binding{};
 std::atomic_bool persistent_input_reset_pending{false};
 bool persistent_input_quarantine = false; // SDL/UI thread only.
 #endif
-std::atomic_bool diagnostics_toggle_pending{false}, issue_marker_pending{false};
+std::atomic_bool diagnostics_toggle_pending{false};
+std::atomic_uint32_t issue_marker_pending{0};
 std::atomic_uint64_t total_keydowns{0}, relevant_keydowns{0}, escape_keydowns{0}, return_keydowns{0},
     function_keydowns{0}, accepted_save_progress{0}, accepted_diagnostics{0}, accepted_issue_markers{0},
     accepted_fast_forward{0}, accepted_cutscene_skips{0};
@@ -1377,8 +1378,19 @@ bool physical_controller() noexcept { return published_physical.load(std::memory
 bool rumble_capable() noexcept { return published_rumble.load(std::memory_order_acquire); }
 void post_diagnostics_toggle() noexcept { diagnostics_toggle_pending.store(true, std::memory_order_release); }
 bool consume_diagnostics_toggle() noexcept { return diagnostics_toggle_pending.exchange(false, std::memory_order_acq_rel); }
-void post_issue_marker() noexcept { issue_marker_pending.store(true, std::memory_order_release); }
-bool consume_issue_marker() noexcept { return issue_marker_pending.exchange(false, std::memory_order_acq_rel); }
+void post_issue_marker() noexcept {
+    auto pending = issue_marker_pending.load(std::memory_order_relaxed);
+    while (pending != UINT32_MAX && !issue_marker_pending.compare_exchange_weak(
+        pending, pending + 1U, std::memory_order_release, std::memory_order_relaxed)) {}
+}
+bool consume_issue_marker() noexcept {
+    auto pending = issue_marker_pending.load(std::memory_order_acquire);
+    while (pending != 0U) {
+        if (issue_marker_pending.compare_exchange_weak(
+            pending, pending - 1U, std::memory_order_acq_rel, std::memory_order_acquire)) return true;
+    }
+    return false;
+}
 void note_relevant_keydown(std::uint32_t scancode, bool repeat, bool game_started,
     bool keyboard_focus, bool all_input_disabled, bool context_capture, bool binding_scan, bool skip_events) noexcept {
     total_keydowns.fetch_add(1, std::memory_order_relaxed);

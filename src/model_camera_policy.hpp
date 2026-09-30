@@ -15,6 +15,7 @@ struct CameraPolicyContext {
     bool map_available = false;
     bool scene_activation = false;
     bool cutscene = false;
+    bool original_cutscene_motion = false;
     bool title_character_draw = false;
 };
 
@@ -27,7 +28,10 @@ constexpr bool interpolate_cpu_pose_camera(CameraPolicyContext context) noexcept
     const bool recorded_demo = context.frontend_mode == 2 && context.replay_record_available;
     return gameplay_level && (context.save_slot >= 0 || recorded_demo) &&
         context.game_type != 3 &&
-        context.map_available && !context.scene_activation && !context.cutscene &&
+        context.map_available && !context.scene_activation &&
+        // In-world cinematics share the scene camera just like gameplay.
+        // Only an explicit original-motion cutscene keeps its guest camera.
+        !(context.cutscene && context.original_cutscene_motion) &&
         !context.title_character_draw;
 }
 

@@ -23,6 +23,8 @@ NATIVE_TOKEN = re.compile(r"\b((?:tooie_|boot_|os\w*_|__\w*_)\w*|recomp_syscall_
 RUNTIME_ADAPTERS = frozenset({"osRecvMesg_recomp", "osSendMesg_recomp", "osJamMesg_recomp",
     "osStartThread_recomp", "osStopThread_recomp", "osSetThreadPri_recomp", "recomp_syscall_handler"})
 SYSCALL = re.compile(r"^\s*recomp_syscall_handler\(rdram,\s*ctx,\s*[^;]+\);\s*$")
+BACKPACK_BEGIN = '    tooie_model_backpack_draw_begin((uint32_t)ctx->r16);\n'
+BACKPACK_END = '    tooie_model_backpack_draw_end();\n'
 
 
 def digest(data):
@@ -92,7 +94,20 @@ def lift_body(body, function_id, generated_names, adapters=frozenset(), checkpoi
 
     lines = []
     checkpoint_seen = False
+    backpack_bracket_open = False
+    backpack_end_after_resume = False
     for line in content.splitlines(keepends=True):
+        if backpack_end_after_resume:
+            if line != BACKPACK_END:
+                raise ValueError(f"{name}: backpack bracket lost adjacent end")
+            backpack_end_after_resume = False
+            continue
+        if line == BACKPACK_BEGIN:
+            if backpack_bracket_open:
+                raise ValueError(f"{name}: nested backpack bracket")
+            backpack_bracket_open = True
+            lines.append(line)
+            continue
         if checkpoint is not None and line.startswith(f"    // 0x{checkpoint:08X}:"):
             if checkpoint_seen:
                 raise ValueError(f"{name}: duplicate checkpoint instruction")
@@ -105,6 +120,9 @@ def lift_body(body, function_id, generated_names, adapters=frozenset(), checkpoi
         lookup = LOOKUP.fullmatch(line.rstrip("\n"))
         syscall = "recomp_syscall_handler" in adapters and SYSCALL.fullmatch(line.rstrip("\n"))
         if lookup or syscall or (call and (call["name"] in generated_names or call["name"] in adapters)):
+            close_backpack = backpack_bracket_open
+            if close_backpack and (not call or call["name"] != "func_800DE448"):
+                raise ValueError(f"{name}: backpack bracket has unexpected guest call")
             pc = next_pc
             next_pc += 1
             if pc == checkpoint:
@@ -118,6 +136,10 @@ def lift_body(body, function_id, generated_names, adapters=frozenset(), checkpoi
             else:
                 direct_calls += 1
                 lines.append(line)
+            if close_backpack:
+                lines.append(BACKPACK_END)
+                backpack_bracket_open = False
+                backpack_end_after_resume = True
             lines.append("    if (tooie_persist_yielded()) return;\n")
             lines.append(f"persistent_resume_{pc}:\n")
         elif line.strip() == "return;":
@@ -142,6 +164,8 @@ def lift_body(body, function_id, generated_names, adapters=frozenset(), checkpoi
                     raise ValueError(f"{name}: native callback in multiline expression needs an explicit contract")
                 lines.append("    tooie_persist_invalidate();\n")
             lines.append(line)
+    if backpack_bracket_open or backpack_end_after_resume:
+        raise ValueError(f"{name}: unterminated backpack bracket")
     if checkpoint is not None and not checkpoint_seen:
         raise ValueError(f"{name}: checkpoint instruction not present")
     declarations = PREAMBLE + "".join(f"    {kind} {var} = 0;\n" for kind, var in extra)

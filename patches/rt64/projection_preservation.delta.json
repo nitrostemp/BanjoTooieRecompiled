@@ -1,7 +1,7 @@
 {
   "schema": 1,
   "name": "rt64_projection_preservation",
-  "delta_revision": 3,
+  "delta_revision": 5,
   "upstream": {
     "dependency": "rt64",
     "commit": "6f1c2d99a4ea571c139f449c326fd176ba8f3496",
@@ -11,10 +11,33 @@
   },
   "output": {
     "filename": "rt64_projection_processor.cpp",
-    "sha256": "3cec637d6b29f9ed055dd36b652517e4284166997551fd32c6f81ce456ee0c45",
-    "lines": 215
+    "sha256": "6b8bace6c1d94794c14a95d7261222524c969eba4aaa9b778dc815bc63da4ecd",
+    "lines": 224
   },
   "operations": [
+    {
+      "original_start": 8,
+      "original_end": 8,
+      "original_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "replacement_lines": [
+        "#include \"rt64_aux_projection_camera.hpp\"\n"
+      ]
+    },
+    {
+      "original_start": 50,
+      "original_end": 50,
+      "original_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "replacement_lines": [
+        "\n",
+        "        if (p.prevFrame != nullptr) {\n",
+        "            for (uint32_t w : p.curFrame->workloads) {\n",
+        "                if (w < p.curFrame->frameMap.workloads.size())\n",
+        "                    tooieApplyAuxiliaryCameraFallback(p.workloadQueue->workloads[w],\n",
+        "                        p.curFrame->frameMap.workloads[w], p.aspectRatioScale);\n",
+        "            }\n",
+        "        }\n"
+      ]
+    },
     {
       "original_start": 72,
       "original_end": 73,

@@ -11,7 +11,7 @@ must provide your own supported copy of the game.
 
 ## Alpha status
 
-A Windows x64 alpha is available. Apple Silicon/macOS and Linux builds
+Windows x64 alpha releases are available. Apple Silicon/macOS and Linux builds
 are not ready.
 
 ## Download and install

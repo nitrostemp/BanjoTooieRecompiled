@@ -1,4 +1,6 @@
 #include "rt64_matrix_trace.hpp"
+#include "rt64_edge_trace_policy.hpp"
+#include "rt64_trace_window.hpp"
 
 #include "hle/rt64_workload_queue.h"
 
@@ -17,11 +19,99 @@ namespace {
 std::atomic<uint32_t> screenXTraceArm{0};
 std::filesystem::path screenXTraceDirectory;
 std::ofstream screenXTraceFile;
+std::ofstream cameraTraceFile;
+std::ofstream edgeTraceFile;
 size_t screenXTraceBytes = 0;
+size_t cameraTraceBytes = 0;
+size_t edgeTraceBytes = 0;
 constexpr size_t screenXTraceByteCap = 4U << 20;
 
-float maxAbsDifference(const hlslpp::float4x4 &a, const hlslpp::float4x4 &b,
-    int firstColumn = 0) noexcept {
+// Dense camera history is independent of drawable visibility. It distinguishes
+// guest collision oscillation from an incorrect previous projection or a
+// presentation-weight reset; averaged screen coordinates cannot do that.
+void traceCamera(const WorkloadQueue &queue, const GameFrame &frame, uint32_t call, float weight,
+                 bool processed, uint32_t generation) {
+    if (!cameraTraceFile.is_open() || !cameraTraceFile)
+        return;
+    // Log scene references, including shared transforms, so a secondary view
+    // cannot be mistaken for the main camera. The byte cap bounds all scenes.
+    for (unsigned kind = 0; kind < 2; ++kind) {
+        const auto &scenes = kind == 0 ? frame.perspectiveScenes : frame.orthographicScenes;
+        for (size_t sceneIndex = 0; sceneIndex < scenes.size(); ++sceneIndex) {
+            for (const auto &indices : scenes[sceneIndex].projections) {
+                if (!cameraTraceFile.is_open() || !cameraTraceFile)
+                    return;
+                const uint32_t w = indices.workloadIndex;
+                if (w >= queue.workloads.size())
+                    continue;
+                const auto &workload = queue.workloads[w];
+                const auto &data = workload.drawData;
+                const auto *map =
+                    w < frame.frameMap.workloads.size() ? &frame.frameMap.workloads[w] : nullptr;
+                const auto *previous = map && map->mapped && map->prevWorkloadIndex < queue.workloads.size()
+                                           ? &queue.workloads[map->prevWorkloadIndex]
+                                           : nullptr;
+                if (indices.fbPairIndex >= workload.fbPairs.size())
+                    continue;
+                const auto &pair = workload.fbPairs[indices.fbPairIndex];
+                if (indices.projectionIndex >= pair.projections.size())
+                    continue;
+                const uint32_t p = pair.projections[indices.projectionIndex].transformsIndex;
+                {
+                    if (p >= data.viewTransforms.size() || p >= data.viewProjTransforms.size())
+                        continue;
+                    const auto *projectionMap = map && map->mapped && p < map->viewProjections.size()
+                                                    ? &map->viewProjections[p]
+                                                    : nullptr;
+                    const bool mapped =
+                        previous && projectionMap && projectionMap->mapped &&
+                        projectionMap->prevTransformIndex < previous->drawData.viewProjTransforms.size();
+                    const auto &raw = data.viewProjTransforms[p];
+                    const auto &prior =
+                        mapped ? previous->drawData.viewProjTransforms[projectionMap->prevTransformIndex]
+                               : raw;
+                    const auto &final = processed && p < data.modViewProjTransforms.size()
+                                            ? data.modViewProjTransforms[p]
+                                            : raw;
+                    char line[4096];
+                    int length = std::snprintf(
+                        line, sizeof(line), "%u,%.9g,%llu,%llu,%u,%u,%u,%u,%u,%zu,%u,%u,%u", call, weight,
+                        static_cast<unsigned long long>(workload.workloadId),
+                        static_cast<unsigned long long>(previous ? previous->workloadId : 0), p,
+                        unsigned(mapped), mapped ? projectionMap->prevTransformIndex : UINT32_MAX,
+                        unsigned(processed), kind, sceneIndex, indices.fbPairIndex, indices.projectionIndex, generation);
+                    for (const auto *matrix : {&data.viewTransforms[p], &raw, &prior, &final}) {
+                        for (int row = 0; row < 4; ++row) {
+                            for (int col = 0; col < 4; ++col) {
+                                if (length < 0 || size_t(length) >= sizeof(line)) {
+                                    cameraTraceFile.close();
+                                    return;
+                                }
+                                const int written = std::snprintf(line + length, sizeof(line) - length,
+                                                                  ",%.9g", float((*matrix)[row][col]));
+                                if (written < 0) {
+                                    cameraTraceFile.close();
+                                    return;
+                                }
+                                length += written;
+                            }
+                        }
+                    }
+                    if (length < 0 || size_t(length) + 1 >= sizeof(line) ||
+                        size_t(length) + 1 > screenXTraceByteCap - cameraTraceBytes) {
+                        cameraTraceFile.close();
+                        return;
+                    }
+                    line[length++] = '\n';
+                    cameraTraceFile.write(line, length);
+                    cameraTraceBytes += size_t(length);
+                }
+            }
+        }
+    }
+}
+
+float maxAbsDifference(const hlslpp::float4x4 &a, const hlslpp::float4x4 &b, int firstColumn = 0) noexcept {
     float result = 0.0f;
     for (int row = 0; row < 4; ++row) {
         for (int column = firstColumn; column < 4; ++column) {
@@ -93,7 +183,7 @@ uint32_t worldGroupId(const DrawData &data, uint32_t matrixIndex) noexcept {
 
 void traceScreenX(const WorkloadQueue &queue, const GameFrame &frame,
     uint32_t call, float weight, bool projectionsProcessed,
-    bool transformsProcessed) noexcept {
+    bool transformsProcessed, uint32_t generation) noexcept {
     if (!screenXTraceFile || call >= 420 || call % 7 != 0) return;
 
     // Compare the same current vertices under all four matrix combinations.
@@ -195,7 +285,7 @@ void traceScreenX(const WorkloadQueue &queue, const GameFrame &frame,
             char line[512];
             const int length = std::snprintf(line, sizeof(line),
                 "%u,%.5f,%llu,%llu,%u,%u,%u,%08x,%08x,%08x,%zu,%u,%u,%u,%u,%u,%u,"
-                "%.4f,%.4f,%.4f,%.4f,%.4f,%.4f,%.4f,%.4f,%.4g,%.4g,%.4g\n",
+                "%.4f,%.4f,%.4f,%.4f,%.4f,%.4f,%.4f,%.4f,%.4g,%.4g,%.4g,%u\n",
                 call, weight, static_cast<unsigned long long>(workload.workloadId),
                 static_cast<unsigned long long>(previousWorkloadId), w, m, projection,
                 worldGroupId(data, m), projectionGroupId, physical,
@@ -210,7 +300,7 @@ void traceScreenX(const WorkloadQueue &queue, const GameFrame &frame,
                 sumX[2] / samples, sumY[2] / samples,
                 sumX[3] / samples, sumY[3] / samples,
                 float(rawWorld[3][0]), float(rawWorld[3][1]),
-                float(rawWorld[3][2]));
+                float(rawWorld[3][2]), generation);
             if (length <= 0 || size_t(length) >= sizeof(line) ||
                 size_t(length) > screenXTraceByteCap - screenXTraceBytes) {
                 screenXTraceFile.close();
@@ -220,6 +310,211 @@ void traceScreenX(const WorkloadQueue &queue, const GameFrame &frame,
             screenXTraceBytes += size_t(length);
         }
     }
+}
+
+// F4 captures a rotating, bounded triangle sample. Centroids can stay stable
+// while one edge stretches; these endpoints distinguish that from camera motion.
+struct F4EdgePoint { float x = 0.0f, y = 0.0f, w = 0.0f; };
+struct F4EdgeRecord {
+    uint64_t workloadId = 0, previousWorkloadId = 0;
+    uint32_t workloadSlot = 0, triangleTotal = 0, scanFirst = 0, scanCount = 0;
+    uint32_t triangle = 0, vertex[2]{}, world[2]{}, physical[2]{}, group[2]{};
+    uint32_t previous[2]{}, projection[2]{};
+    F4EdgePoint raw[2], final[2];
+    float rawLength = 0.0f, finalLength = 0.0f;
+};
+
+void writeF4EdgeLine(const char *line, int length) noexcept {
+    if (!edgeTraceFile || length <= 0 ||
+        size_t(length) > tooie::rt64_edge_trace::max_file_bytes - edgeTraceBytes) {
+        edgeTraceFile.close();
+        return;
+    }
+    edgeTraceFile.write(line, length);
+    edgeTraceBytes += size_t(length);
+    if (!edgeTraceFile) edgeTraceFile.close();
+}
+
+void traceF4Edges(const WorkloadQueue &queue, const GameFrame &frame,
+    uint32_t call, float weight, bool projectionsProcessed,
+    bool transformsProcessed, uint32_t generation) noexcept {
+    using namespace tooie::rt64_edge_trace;
+    if (!edgeTraceFile || !sample_enabled(call)) return;
+    TopEdges<4, F4EdgeRecord> longest, changed;
+    const uint32_t sample = call / sample_stride;
+    for (uint32_t w : frame.workloads) {
+        if (w >= queue.workloads.size()) continue;
+        const auto &workload = queue.workloads[w];
+        const auto &data = workload.drawData;
+        const auto *map = w < frame.frameMap.workloads.size()
+            ? &frame.frameMap.workloads[w] : nullptr;
+        const uint64_t previousId = map && map->mapped &&
+            map->prevWorkloadIndex < queue.workloads.size()
+            ? queue.workloads[map->prevWorkloadIndex].workloadId : 0;
+        const uint32_t total = uint32_t(std::min<size_t>(
+            data.faceIndices.size() / 3, UINT32_MAX));
+        const uint32_t count = scan_count(total, uint32_t(frame.workloads.size()));
+        const uint32_t first = scan_first(sample, count, total);
+        uint32_t skippedW = 0;
+        for (uint32_t i = 0; i < count; ++i) {
+            const uint32_t triangle = (first + i) % total;
+            F4EdgePoint raw[3], final[3];
+            uint32_t vertex[3]{}, world[3]{}, projection[3]{};
+            bool valid = true;
+            for (uint32_t corner = 0; corner < 3; ++corner) {
+                const uint32_t v = data.faceIndices[size_t(triangle) * 3 + corner];
+                if (v >= data.worldIndices.size() || v >= data.viewProjIndices.size() ||
+                    size_t(v) * 3 + 2 >= data.posFloats.size()) {
+                    valid = false; break;
+                }
+                const uint32_t m = data.worldIndices[v];
+                const uint32_t p = data.viewProjIndices[v];
+                if (m >= data.worldTransforms.size() ||
+                    p >= data.viewProjTransforms.size() || p >= data.rspViewports.size()) {
+                    valid = false; break;
+                }
+                vertex[corner] = v;
+                world[corner] = m;
+                projection[corner] = p;
+                const size_t pos = size_t(v) * 3;
+                const hlslpp::float4 rawLocal(data.posFloats[pos],
+                    data.posFloats[pos + 1], data.posFloats[pos + 2], 1.0f);
+                auto finalLocal = rawLocal;
+                if (pos + 2 < data.velFloats.size())
+                    finalLocal -= hlslpp::float4(data.velFloats[pos],
+                        data.velFloats[pos + 1], data.velFloats[pos + 2], 0.0f)
+                        * (1.0f - weight);
+                const auto &rawWorld = data.worldTransforms[m];
+                const auto &finalWorld = transformsProcessed && m < data.lerpWorldTransforms.size()
+                    ? data.lerpWorldTransforms[m] : rawWorld;
+                const auto &rawProjection = data.viewProjTransforms[p];
+                const auto &finalProjection = projectionsProcessed &&
+                    p < data.modViewProjTransforms.size()
+                    ? data.modViewProjTransforms[p] : rawProjection;
+                const hlslpp::float4 clips[2] = {
+                    hlslpp::mul(hlslpp::mul(rawLocal, rawWorld), rawProjection),
+                    hlslpp::mul(hlslpp::mul(finalLocal, finalWorld), finalProjection)
+                };
+                const auto &viewport = data.rspViewports[p];
+                F4EdgePoint *points[2] = {&raw[corner], &final[corner]};
+                for (uint32_t kind = 0; kind < 2; ++kind) {
+                    const float clipW = float(clips[kind].w);
+                    if (!std::isfinite(clipW) || clipW <= 0.0001f) {
+                        valid = false; ++skippedW; break;
+                    }
+                    points[kind]->w = clipW;
+                    points[kind]->x = float(viewport.translate.x) +
+                        float(viewport.scale.x) * float(clips[kind].x) / clipW;
+                    points[kind]->y = float(viewport.translate.y) -
+                        float(viewport.scale.y) * float(clips[kind].y) / clipW;
+                    if (!std::isfinite(points[kind]->x) ||
+                        !std::isfinite(points[kind]->y)) valid = false;
+                }
+                if (!valid) break;
+            }
+            if (!valid) continue;
+            for (uint32_t edge = 0; edge < 3; ++edge) {
+                const uint32_t next = (edge + 1) % 3;
+                const auto &vp = data.rspViewports[projection[edge]];
+                const float width = 2.0f * float(vp.translate.x);
+                const float height = 2.0f * float(vp.translate.y);
+                const auto intersects = [&](const F4EdgePoint &a,
+                    const F4EdgePoint &b) {
+                    return std::max(a.x, b.x) >= -32.0f &&
+                        std::min(a.x, b.x) <= width + 32.0f &&
+                        std::max(a.y, b.y) >= -32.0f &&
+                        std::min(a.y, b.y) <= height + 32.0f;
+                };
+                if (!intersects(raw[edge], raw[next]) &&
+                    !intersects(final[edge], final[next])) continue;
+                F4EdgeRecord record{};
+                record.workloadId = workload.workloadId;
+                record.previousWorkloadId = previousId;
+                record.workloadSlot = w;
+                record.triangleTotal = total;
+                record.scanFirst = first;
+                record.scanCount = count;
+                record.triangle = triangle;
+                for (uint32_t endpoint = 0; endpoint < 2; ++endpoint) {
+                    const uint32_t corner = endpoint ? next : edge;
+                    const uint32_t m = world[corner];
+                    record.vertex[endpoint] = vertex[corner];
+                    record.world[endpoint] = m;
+                    record.projection[endpoint] = projection[corner];
+                    record.physical[endpoint] =
+                        m < data.worldTransformPhysicalAddresses.size()
+                        ? data.worldTransformPhysicalAddresses[m] : 0;
+                    record.group[endpoint] = worldGroupId(data, m);
+                    record.previous[endpoint] = map && map->mapped &&
+                        m < map->transforms.size() && map->transforms[m].mapped
+                        ? map->transforms[m].prevTransformIndex : UINT32_MAX;
+                    record.raw[endpoint] = raw[corner];
+                    record.final[endpoint] = final[corner];
+                }
+                record.rawLength = std::hypot(raw[edge].x - raw[next].x,
+                    raw[edge].y - raw[next].y);
+                record.finalLength = std::hypot(final[edge].x - final[next].x,
+                    final[edge].y - final[next].y);
+                if (!std::isfinite(record.rawLength) ||
+                    !std::isfinite(record.finalLength)) continue;
+                longest.add(std::max(record.rawLength, record.finalLength), record);
+                changed.add(std::fabs(record.finalLength - record.rawLength), record);
+            }
+        }
+        char scanLine[192];
+        const int scanLength = std::snprintf(scanLine, sizeof(scanLine),
+            "scan,0,%u,%.5f,%u,%llu,%llu,%u,%u,%u,%u,%u\n",
+            call, weight, generation,
+            static_cast<unsigned long long>(workload.workloadId),
+            static_cast<unsigned long long>(previousId), w, total, first, count, skippedW);
+        if (scanLength <= 0 || size_t(scanLength) >= sizeof(scanLine)) {
+            edgeTraceFile.close(); return;
+        }
+        writeF4EdgeLine(scanLine, scanLength);
+        if (!edgeTraceFile) return;
+    }
+    const auto emit = [&](const char *kind, uint32_t rank,
+        const F4EdgeRecord &record) {
+        char line[1024];
+        int length = std::snprintf(line, sizeof(line),
+            "%s,%u,%u,%.5f,%u,%llu,%llu,%u,%u,%u,%u,0,%u,%u,%u,%u,%u,"
+            "%08x,%08x,%08x,%08x,%u,%u,%u,%u",
+            kind, rank, call, weight, generation,
+            static_cast<unsigned long long>(record.workloadId),
+            static_cast<unsigned long long>(record.previousWorkloadId),
+            record.workloadSlot, record.triangleTotal, record.scanFirst,
+            record.scanCount, record.triangle, record.vertex[0], record.vertex[1],
+            record.world[0], record.world[1], record.physical[0],
+            record.physical[1], record.group[0], record.group[1],
+            record.previous[0], record.previous[1], record.projection[0],
+            record.projection[1]);
+        const float growth = record.finalLength - record.rawLength;
+        const float values[] = {
+            record.raw[0].x, record.raw[0].y, record.raw[0].w,
+            record.raw[1].x, record.raw[1].y, record.raw[1].w,
+            record.final[0].x, record.final[0].y, record.final[0].w,
+            record.final[1].x, record.final[1].y, record.final[1].w,
+            record.rawLength, record.finalLength, growth,
+            record.rawLength > 0.0001f
+                ? record.finalLength / record.rawLength : 0.0f
+        };
+        for (float value : values) {
+            if (length <= 0 || size_t(length) >= sizeof(line)) break;
+            const int written = std::snprintf(line + length, sizeof(line) - length,
+                ",%.6g", value);
+            if (written < 0) { length = -1; break; }
+            length += written;
+        }
+        if (length <= 0 || size_t(length) + 1 >= sizeof(line)) {
+            edgeTraceFile.close(); return;
+        }
+        line[length++] = '\n';
+        writeF4EdgeLine(line, length);
+    };
+    for (uint32_t rank = 0; rank < longest.count && edgeTraceFile; ++rank)
+        emit("length", rank + 1, longest.values[rank].value);
+    for (uint32_t rank = 0; rank < changed.count && edgeTraceFile; ++rank)
+        emit("change", rank + 1, changed.values[rank].value);
 }
 
 void traceTriangleEdges(const WorkloadQueue &queue, const GameFrame &frame,
@@ -528,36 +823,77 @@ void tooieScreenXTraceArm() noexcept {
 void tooieMatrixTraceFrame(const WorkloadQueue &queue, const GameFrame &curFrame,
     const GameFrame &prevFrame, float curFrameWeight, float prevFrameWeight,
     bool projectionsProcessed, bool transformsProcessed) noexcept {
-    static uint32_t screenArmSeen = 0;
-    static uint32_t screenCalls = 420;
+    static tooie::rt64_trace::Window screenWindow;
+    auto &screenCalls = screenWindow.calls;
     const uint32_t screenArm = screenXTraceArm.load(std::memory_order_acquire);
-    if (screenArm != screenArmSeen) {
-        screenArmSeen = screenArm;
-        screenCalls = 0;
+    if (const uint32_t slot = screenWindow.request(screenArm)) {
         screenXTraceFile.close();
+        cameraTraceFile.close();
+        edgeTraceFile.close();
         screenXTraceBytes = 0;
-        if (screenArm <= 4 && !screenXTraceDirectory.empty()) {
+        cameraTraceBytes = 0;
+        edgeTraceBytes = 0;
+        if (!screenXTraceDirectory.empty()) {
             try {
                 screenXTraceFile.open(screenXTraceDirectory /
-                    ("screen-xy-trace-" + std::to_string(screenArm) + ".csv"),
+                    ("screen-xy-trace-" + std::to_string(slot) + ".csv"),
                     std::ios::out | std::ios::trunc);
                 if (screenXTraceFile) {
                     constexpr char header[] = "sample,weight,workload_id,previous_workload_id,slot,"
                         "world,projection,world_group,projection_group,physical,vertices,sampled,"
                         "mixed_projection,world_mapped,previous_world,projection_mapped,previous_projection,"
                         "raw_x,raw_y,final_x,final_y,model_x,model_y,camera_x,camera_y,"
-                        "world_tx,world_ty,world_tz\n";
+                        "world_tx,world_ty,world_tz,capture_generation\n";
                     screenXTraceFile.write(header, sizeof(header) - 1);
                     screenXTraceBytes = sizeof(header) - 1;
                 }
             } catch (...) { screenXTraceFile.close(); }
+            try {
+                cameraTraceFile.open(screenXTraceDirectory /
+                    ("camera-history-" + std::to_string(slot) + ".csv"),
+                    std::ios::out | std::ios::trunc);
+                if (cameraTraceFile) {
+                    std::string header = "sample,weight,workload_id,previous_workload_id,projection,mapped,previous_projection,processed,scene_kind,scene,framebuffer_pair,projection_slot,capture_generation";
+                    for (const char *name : {"view", "raw", "prior", "final"})
+                        for (int row = 0; row < 4; ++row)
+                            for (int col = 0; col < 4; ++col)
+                                header += "," + std::string(name) + std::to_string(row) + std::to_string(col);
+                    header += '\n';
+                    cameraTraceFile.write(header.data(), header.size());
+                    cameraTraceBytes = header.size();
+                }
+            } catch (...) { cameraTraceFile.close(); }
+            try {
+                edgeTraceFile.open(screenXTraceDirectory /
+                    ("triangle-edges-" + std::to_string(slot) + ".csv"),
+                    std::ios::out | std::ios::trunc);
+                if (edgeTraceFile) {
+                    constexpr char header[] =
+                        "kind,rank,sample,weight,capture_generation,workload_id,"
+                        "previous_workload_id,workload_slot,triangles_total,scan_first,"
+                        "scan_count,skipped_w,triangle,vertex_a,vertex_b,world_a,world_b,"
+                        "physical_a,physical_b,group_a,group_b,previous_world_a,"
+                        "previous_world_b,projection_a,projection_b,raw_ax,raw_ay,raw_aw,"
+                        "raw_bx,raw_by,raw_bw,final_ax,final_ay,final_aw,final_bx,"
+                        "final_by,final_bw,raw_length,final_length,growth,ratio\n";
+                    edgeTraceFile.write(header, sizeof(header) - 1);
+                    edgeTraceBytes = sizeof(header) - 1;
+                }
+            } catch (...) { edgeTraceFile.close(); }
         }
     }
-    if (screenCalls < 420)
+    if (screenCalls < 420) {
+        traceCamera(queue, curFrame, screenCalls, curFrameWeight, projectionsProcessed, screenWindow.generation);
+        traceF4Edges(queue, curFrame, screenCalls, curFrameWeight,
+            projectionsProcessed, transformsProcessed, screenWindow.generation);
         traceScreenX(queue, curFrame, screenCalls++, curFrameWeight,
-            projectionsProcessed, transformsProcessed);
-    if (screenCalls == 420 && screenXTraceFile)
+            projectionsProcessed, transformsProcessed, screenWindow.generation);
+    }
+    if (screenCalls == 420) {
         screenXTraceFile.close();
+        cameraTraceFile.close();
+        edgeTraceFile.close();
+    }
     static const bool logoTrace = [] {
         const char* value = std::getenv("TOOIE_LOGO_TRACE");
         return value && std::string_view(value) == "1";

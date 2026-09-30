@@ -77,5 +77,8 @@ void reset() noexcept;
 } // namespace tooie::camera_interpolation
 
 extern "C" void tooie_camera_interpolation_observe_active(std::uint32_t handle) noexcept;
+// Guest ncpod_entrypoint_12 calls this only after it has replaced one of its
+// dialog/ucam/fixed-position camera allocations.
+extern "C" void tooie_camera_interpolation_request_skip() noexcept;
 extern "C" bool tooie_camera_interpolation_bind_task(std::uint32_t display_list,
     std::uint32_t display_list_size) noexcept;

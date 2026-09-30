@@ -8,6 +8,10 @@ SPEC = importlib.util.spec_from_file_location(
     "instrument_continuous", ROOT / "tools" / "instrument_continuous.py")
 MODULE = importlib.util.module_from_spec(SPEC)
 SPEC.loader.exec_module(MODULE)
+LIFT_SPEC = importlib.util.spec_from_file_location(
+    "lift_persistent_continuations", ROOT / "tools" / "lift_persistent_continuations.py")
+LIFT = importlib.util.module_from_spec(LIFT_SPEC)
+LIFT_SPEC.loader.exec_module(LIFT)
 
 
 class CallsiteObservationOrderTest(unittest.TestCase):
@@ -39,6 +43,36 @@ class CallsiteObservationOrderTest(unittest.TestCase):
 
 
 class RawGenerationOrderTest(unittest.TestCase):
+    def test_backpack_bracket_accepts_pristine_call_and_closes_before_yield(self):
+        source = """#include "funcs.h"
+RECOMP_FUNC void babackpack_entrypoint_3(uint8_t* rdram, recomp_context* ctx) {
+    uint64_t hi = 0, lo = 0, result = 0;
+    int c1cs = 0;
+    // 0x808003FC: jal         0x800DE448
+    // 0x80800400: lw          $a3, 0x38($sp)
+    ctx->r7 = MEM_W(ctx->r29, 0X38);
+    func_800DE448(rdram, ctx);
+        goto after_14;
+after_14:
+    return;
+;}\n"""
+        changed, count = MODULE.apply_backpack_model_draw_hooks(source, "fixture")
+        self.assertEqual(count, 2)
+        self.assertIn(
+            "tooie_model_backpack_draw_begin((uint32_t)ctx->r16);\n"
+            "    func_800DE448(rdram, ctx);\n"
+            "    tooie_model_backpack_draw_end();\n"
+            "        goto after_14;", changed)
+        body = next(LIFT.BODY.finditer(changed))[0]
+        lifted, _ = LIFT.lift_body(body, 1,
+            {"babackpack_entrypoint_3", "func_800DE448"})
+        self.assertIn(
+            "func_800DE448(rdram, ctx);\n"
+            "    tooie_model_backpack_draw_end();\n"
+            "    if (tooie_persist_yielded()) return;\n"
+            "persistent_resume_1:", lifted)
+        self.assertEqual(lifted.count("tooie_model_backpack_draw_end();"), 1)
+
     def test_replay_hooks_accept_raw_generator_shape(self):
         source = """#include "funcs.h"
 RECOMP_FUNC void func_8001608C(uint8_t* rdram, recomp_context* ctx) {
