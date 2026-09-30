@@ -7,12 +7,12 @@ must provide your own supported copy of the game.
 
 ## Alpha status
 
-A Windows x64 alpha is in preparation; no public download is available yet,
-and Apple Silicon/macOS and Linux builds are not ready.
+Windows x64 alpha releases are available. Apple Silicon/macOS and Linux builds
+are not ready.
 
 ## Download and install
 
-When a reviewed Windows ZIP is made available, download it from the
+Download the Windows ZIP from the
 [project's Releases page](https://github.com/some-scurvy-dog/BanjoTooieRecompiled/releases),
 extract the entire ZIP to a folder, and keep its files together. Run
 `TooieRecompiled.exe` from that folder. There is no installer.

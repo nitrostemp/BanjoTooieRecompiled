@@ -1,5 +1,6 @@
 #include "artifact_capture.hpp"
 #include "rt64_matrix_trace.hpp"
+#include "model_interpolation.hpp"
 
 #include "hle/rt64_state.h"
 #include "hle/rt64_workload_queue.h"
@@ -201,6 +202,7 @@ bool call_match_hash(const RT64::Workload& workload, const RT64::DrawCall& call,
 void request() noexcept {
     pending_tasks.store(kTasksPerRequest, std::memory_order_release);
     RT64::tooieScreenXTraceArm();
+    tooie::model_interpolation::arm_trace();
 }
 
 bool try_claim() noexcept {

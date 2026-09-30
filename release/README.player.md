@@ -1,6 +1,6 @@
 # Banjo-Tooie: Recompiled
 
-Windows x64 Alpha 2 ZIP release. The game is not included: you need your own
+Windows x64 Alpha 3 ZIP release. The game is not included: you need your own
 supported copy of Banjo-Tooie. There is no installer.
 
 ## Start playing
@@ -11,9 +11,8 @@ supported copy of Banjo-Tooie. There is no installer.
    NTSC-U 1.0 big-endian `.z64` Banjo-Tooie ROM. Then choose **Start Game**.
 4. Open **Controls** to check bindings. Press Escape during play for settings.
 
-Alpha 2 fixes the reported character, fire and ground-button jitter in gameplay
-and ground-button jitter in recorded **Press Start** attract demos. These fixes
-were verified in the reported scenes with **Custom / Display / Present Early**.
+Alpha 3 fixes reported camera, character, backpack, feather and mine rendering
+issues. See the [release notes](docs/RELEASE_NOTES.md) for changes and known issues.
 
 Supported ROM SHA-256:
 
@@ -26,7 +25,7 @@ Supported ROM SHA-256:
 Your profile, including saves and settings, is in
 `%LOCALAPPDATA%\BanjoTooieRecompiled`. Back up its `saves` folder before trying
 progression tools or a different version. Existing ordinary saves, settings,
-controls and the selected ROM remain there when updating from Alpha 1. A
+controls and the selected ROM remain there when updating from an earlier alpha. A
 profile from an earlier test build is copied there automatically on first
 start, and the original is left unchanged. F5 is ordinary progress saving, not
 a save state. Turning off cheats stops active effects but keeps progression

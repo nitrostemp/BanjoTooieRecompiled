@@ -8,12 +8,16 @@
 #include "profile_location.hpp"
 #include "runtime_save_root.hpp"
 #include "rt64_matrix_trace.hpp"
+#include "model_interpolation.hpp"
+#include "issue_capture_archive.hpp"
 #include "tooie_build_identity.hpp"
 
 #include "librecomp/game.hpp"
 #include "librecomp/mods.hpp"
 
 #include <cstdlib>
+#include <atomic>
+#include <chrono>
 #include <memory>
 #include <stdexcept>
 #include <utility>
@@ -67,7 +71,13 @@ int tooie::frontend::run(const std::filesystem::path& profile_override,
     std::filesystem::create_directories(config_root);
     std::filesystem::create_directories(profile_root / "saves");
     std::filesystem::create_directories(log_root);
-    RT64::tooieScreenXTraceSetLogDirectory(log_root);
+    // Claim a fresh directory even on rapid process restarts. Capture numbers
+    // are local to this directory and never reuse an earlier session's files.
+    const auto capture_root = tooie::capture_archive::create_session_directory(log_root);
+    RT64::tooieScreenXTraceSetLogDirectory(capture_root);
+    tooie::model_interpolation::set_trace_directory(capture_root);
+    auto capture_archive = std::make_shared<tooie::capture_archive::Writer>(capture_root);
+    auto marker_sequence = std::make_shared<std::atomic_uint64_t>(0);
 
     auto session_log = std::make_shared<tooie::session_log::Writer>(log_root);
     process_exit_log = session_log;
@@ -77,9 +87,24 @@ int tooie::frontend::run(const std::filesystem::path& profile_override,
         graphics_capture_log=std::make_shared<tooie::session_log::Writer>(
             log_root,1U<<20,3,"graphics-captures.jsonl");
     } catch (...) { /* Optional diagnostics do not prevent play. */ }
-    const auto log = [session_log,graphics_capture_log](const char* event, const nlohmann::json& fields) {
+    const auto log = [session_log,graphics_capture_log,capture_archive,marker_sequence,capture_root](const char* event, const nlohmann::json& fields) {
         session_log->write(event, fields.dump());
         const std::string_view name(event);
+        if (name == "issue_marker" || name == "artifact_draw_capture" ||
+            name == "artifact_draw_capture_failure" || name == "artifact_branch_capture" ||
+            name == "frontend_build_identity" || name == "native_graphics_applied") {
+            try {
+                auto saved_fields = fields;
+                if (name == "issue_marker") {
+                    saved_fields["marker_sequence"] = marker_sequence->fetch_add(1) + 1;
+                    saved_fields["capture_directory"] = utf8(capture_root);
+                }
+                const auto now = std::chrono::duration_cast<std::chrono::milliseconds>(
+                    std::chrono::system_clock::now().time_since_epoch()).count();
+                capture_archive->append(nlohmann::json{{"timestamp_unix_ms", now},
+                    {"event", event}, {"fields", std::move(saved_fields)}}.dump());
+            } catch (...) { /* Optional capture archive must not interrupt play. */ }
+        }
         if (name == "frontend_exit" || name == "frontend_failure" ||
             name == "issue_marker") session_log->flush();
         if (graphics_capture_log &&

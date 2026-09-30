@@ -1,4 +1,4 @@
-# Windows player guide — Alpha 2
+# Windows player guide — Alpha 3
 
 This guide covers the Windows launcher and game menus. Extract all of the
 package's contents to one folder and keep the files together. Run
@@ -83,10 +83,8 @@ output rate. Display and presentation options may behave differently by scene
 and hardware; high output rates are not a promise of full high-frame-rate
 compatibility.
 
-Alpha 2 fixes the reported camera-motion jitter in characters, fire and ground
-buttons during gameplay. It also fixes ground-button jitter in recorded
-**Press Start** attract demos. These fixes were verified in the reported scenes
-with **Custom / Display / Present Early**.
+See the [release notes](RELEASE_NOTES.md) for the latest rendering fixes and
+known issues.
 
 The Graphics pages let you choose the display, window mode, output size,
 rendering scale, supported anti-aliasing, downsampling and game framing. Under
@@ -117,8 +115,7 @@ In **Tools > Practice**, choose **Save State** to capture the current practice
 session or **Load State** to restore it. There is one slot; saving replaces its
 previous contents and loading discards unsaved practice progress. A state only
 works with the same build, ROM, gameplay settings and rendering settings. An
-update may make an earlier state unusable. When updating from Alpha 1 to
-Alpha 2, start a fresh practice session and save a new checkpoint. This feature
+update may make an earlier state unusable. When updating to a new alpha, start a fresh practice session and save a new checkpoint. This feature
 is experimental; confirm important results in ordinary gameplay.
 
 Your profile is in `%LOCALAPPDATA%\BanjoTooieRecompiled`. Ordinary saves are

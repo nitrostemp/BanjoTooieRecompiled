@@ -30,6 +30,13 @@ int main() {
     assert(consume_task_interpolation(0x00103000U) == TaskInterpolation::ProjectionReset);
     assert(consumed_skip_count() == 1);
 
+    // ncpod_entrypoint_12 invokes the C seam only after replacing its camera
+    // allocation; it must preserve the same one-task projection reset policy.
+    tooie_camera_interpolation_request_skip();
+    assert(bind_task(0x00103080U));
+    assert(consume_task_interpolation(0x00103080U) == TaskInterpolation::ProjectionReset);
+    assert(consumed_skip_count() == 2);
+
     // Cutscene mode is captured at submission, so a later state/config change
     // cannot relabel an already queued task on the renderer thread.
     configure_cutscene_motion(CutsceneMotion::Original);
@@ -47,7 +54,7 @@ int main() {
     // Original motion takes precedence while active, but the one-shot boundary
     // request is consumed by that exact task and cannot leak to the next one.
     assert(consume_task_interpolation(0x00103200U) == TaskInterpolation::OriginalMotion);
-    assert(stats().consumed_boundary_skips == 1);
+    assert(stats().consumed_boundary_skips == 2);
     assert(stats().consumed_original_motion_tasks == 2);
 
     configure_cutscene_motion(CutsceneMotion::Interpolated);

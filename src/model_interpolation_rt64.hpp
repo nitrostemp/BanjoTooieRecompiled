@@ -11,9 +11,10 @@ struct DrawData;
 uint32_t tooieOriginalPoseGroup(DrawData &data, uint32_t originalGroup,
     uint32_t physicalAddress);
 
-// World and local CPU pose stay at the guest sample in either case. Ordinary
-// gameplay draws may keep the scene's smooth camera; title/cutscene draws use
-// the paired guest camera guard.
+// Local CPU pose stays at the guest sample. Verified task-bound actor roots
+// may interpolate position; other world transforms remain original. Ordinary
+// gameplay and in-world cinematic draws may keep the scene's smooth camera;
+// title draws and explicit original-motion cutscenes retain the guest camera.
 uint32_t tooieOriginalPoseProjectionGroup(DrawData &data,
     uint32_t originalGroup, uint32_t physicalAddress);
 

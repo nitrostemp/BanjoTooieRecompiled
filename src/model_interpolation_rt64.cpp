@@ -4,6 +4,10 @@
 #include "hle/rt64_workload.h"
 
 namespace RT64 {
+namespace {
+uint32_t originalPoseGroup(DrawData &data, uint32_t originalGroup,
+    uint32_t physicalAddress, bool world);
+}
 
 bool tooieOriginalPoseProjectionChanged(const DrawData &data,
     uint32_t projectionIndex, uint32_t originalGroup, uint32_t physicalAddress) {
@@ -26,11 +30,17 @@ uint32_t tooieOriginalPoseProjectionGroup(DrawData &data,
     if (physicalAddress != 0 &&
         tooie::model_interpolation::original_pose_camera_interpolation_for_matrix(
             physicalAddress)) return originalGroup;
-    return tooieOriginalPoseGroup(data, originalGroup, physicalAddress);
+    return originalPoseGroup(data, originalGroup, physicalAddress, false);
 }
 
 uint32_t tooieOriginalPoseGroup(DrawData &data, uint32_t originalGroup,
     uint32_t physicalAddress) {
+    return originalPoseGroup(data, originalGroup, physicalAddress, true);
+}
+
+namespace {
+uint32_t originalPoseGroup(DrawData &data, uint32_t originalGroup,
+    uint32_t physicalAddress, bool world) {
     if (physicalAddress == 0 ||
         !tooie::model_interpolation::original_pose_for_matrix(physicalAddress) ||
         originalGroup >= data.transformGroups.size()) return originalGroup;
@@ -46,9 +56,24 @@ uint32_t tooieOriginalPoseGroup(DrawData &data, uint32_t originalGroup,
     originalPose.texcoordInterpolation = G_EX_COMPONENT_SKIP;
     originalPose.tileInterpolation = G_EX_COMPONENT_SKIP;
     originalPose.lookAtInterpolation = G_EX_COMPONENT_SKIP;
+    const auto rootId = world ?
+        tooie::model_interpolation::original_pose_root_id_for_matrix(physicalAddress) : 0;
+    if (rootId != 0) {
+        originalPose.matrixId = rootId;
+        originalPose.positionInterpolation = G_EX_COMPONENT_INTERPOLATE;
+        // One affine root transforms the entire CPU-deformed mesh coherently.
+        // With decomposition off, this blends its complete 3x3 block.
+        originalPose.rotationInterpolation = G_EX_COMPONENT_INTERPOLATE;
+        // RT64's per-pair CPU policy validates geometry/UV/triangle ownership
+        // before generating local pose velocities for these explicit IDs.
+        originalPose.vertexInterpolation = G_EX_COMPONENT_INTERPOLATE;
+        originalPose.ordering = G_EX_ORDER_LINEAR;
+        originalPose.decompose = false;
+    }
     const uint32_t clonedIndex = uint32_t(data.transformGroups.size());
     data.transformGroups.emplace_back(originalPose);
     return clonedIndex;
+}
 }
 
 } // namespace RT64

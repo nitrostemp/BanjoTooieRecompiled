@@ -323,6 +323,13 @@ target_include_directories(cpu_pose_camera_policy_test PRIVATE
     "${TOOIE_RT64_ROOT}/src" "${TOOIE_RT64_ROOT}/src/contrib"
     "${TOOIE_RT64_ROOT}/src/contrib/hlslpp/include" "${TOOIE_RT64_ROOT}/src/contrib/plume")
 add_test(NAME cpu_pose_camera_policy COMMAND cpu_pose_camera_policy_test)
+add_executable(rt64_cpu_pose_policy_test tests/rt64_cpu_pose_policy_test.cpp)
+target_link_libraries(rt64_cpu_pose_policy_test PRIVATE TooieFoundation)
+target_compile_options(rt64_cpu_pose_policy_test PRIVATE -UNDEBUG)
+target_include_directories(rt64_cpu_pose_policy_test PRIVATE
+    "${TOOIE_RT64_ROOT}/src" "${TOOIE_RT64_ROOT}/src/contrib"
+    "${TOOIE_RT64_ROOT}/src/contrib/hlslpp/include" "${TOOIE_RT64_ROOT}/src/contrib/plume")
+add_test(NAME rt64_cpu_pose_policy COMMAND rt64_cpu_pose_policy_test)
 if(WIN32)
     target_include_directories(graphics_branch_capture_test PRIVATE "${TOOIE_SDL_ROOT}/include")
 endif()

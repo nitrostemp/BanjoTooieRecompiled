@@ -1,7 +1,7 @@
 {
   "schema": 1,
   "name": "rt64_game_frame_matching",
-  "delta_revision": 7,
+  "delta_revision": 12,
   "upstream": {
     "dependency": "rt64",
     "commit": "6f1c2d99a4ea571c139f449c326fd176ba8f3496",
@@ -11,8 +11,8 @@
   },
   "output": {
     "filename": "rt64_game_frame.cpp",
-    "sha256": "540d594eb1276f44e344294d90f0fbe829ecf507cf3f0262762915ef694727aa",
-    "lines": 1203
+    "sha256": "0fb58ebdba1cc2c681d360632efc8af275115e32103f4c497561a7dfce23ae3e",
+    "lines": 1231
   },
   "operations": [
     {
@@ -23,7 +23,10 @@
         "#include <algorithm>\n",
         "#include <array>\n",
         "#include \"rt64_alias_coherence.hpp\"\n",
-        "#include \"rt64_auto_match_policy.hpp\"\n"
+        "#include \"rt64_auto_match_policy.hpp\"\n",
+        "#include \"rt64_scene_match_policy.hpp\"\n",
+        "#include \"rt64_cpu_pose_policy.hpp\"\n",
+        "#include \"rt64_aux_projection_policy.hpp\"\n"
       ]
     },
     {
@@ -36,11 +39,26 @@
       ]
     },
     {
+      "original_start": 343,
+      "original_end": 343,
+      "original_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "replacement_lines": [
+        "                const Workload &pairedPrevious = workloadQueue.workloads[curWorkloadMap.prevWorkloadIndex];\n",
+        "                const bool stableCurrentPass = tooie::rt64_match::same_projection_prefix(\n",
+        "                    curWorkload, pairedPrevious, curFirstProj.fbPairIndex, curFirstProj.projectionIndex);\n"
+      ]
+    },
+    {
       "original_start": 345,
       "original_end": 345,
       "original_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
       "replacement_lines": [
-        "                    if (curWorkloadMap.prevWorkloadIndex != prevFirstProj.workloadIndex) continue;\n"
+        "                    if (curWorkloadMap.prevWorkloadIndex != prevFirstProj.workloadIndex) continue;\n",
+        "                    const bool stablePreviousPass = tooie::rt64_match::same_projection_prefix(\n",
+        "                        curWorkload, pairedPrevious, prevFirstProj.fbPairIndex, prevFirstProj.projectionIndex);\n",
+        "                    if (!tooie::rt64_match::allow_scene_pass_pair(stableCurrentPass || stablePreviousPass,\n",
+        "                            curFirstProj.fbPairIndex, curFirstProj.projectionIndex,\n",
+        "                            prevFirstProj.fbPairIndex, prevFirstProj.projectionIndex)) continue;\n"
       ]
     },
     {
@@ -79,6 +97,20 @@
       "replacement_lines": [
         "            if (mappedViewProjIndex == UINT32_MAX &&\n",
         "                prevScene.projections[p].workloadIndex != firstPrevProjIndices.workloadIndex) continue;\n"
+      ]
+    },
+    {
+      "original_start": 481,
+      "original_end": 481,
+      "original_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "replacement_lines": [
+        "\n",
+        "                // Auxiliary views can reuse a projection ordinal for a different\n",
+        "                // actor. Reject discontinuous history without capping the main camera.\n",
+        "                if (viewProjMap.mapped && curProjGroup.matrixId == G_EX_ID_AUTO &&\n",
+        "                    !tooie::rt64_match::allow_auxiliary_projection_pair(\n",
+        "                        curWorkload, prevWorkload, curView, prevView))\n",
+        "                    viewProjMap.mapped = false;\n"
       ]
     },
     {
@@ -289,13 +321,13 @@
         "            const hlslpp::float4x4 &prevTransform = firstPrevWorkload.drawData.worldTransforms[indices.second];\n",
         "            const uint32_t prevGroupIndex = firstPrevWorkload.drawData.worldTransformGroups[indices.second];\n",
         "            const TransformGroup &prevGroup = firstPrevWorkload.drawData.transformGroups[prevGroupIndex];\n",
-        "            const bool autoSkipQuad = tooie::rt64_match::guard_auto_skip_quad(\n",
+        "            const bool autoSkipMesh = tooie::rt64_match::guard_auto_skip_mesh(\n",
         "                curGroup.matrixId == G_EX_ID_AUTO && prevGroup.matrixId == G_EX_ID_AUTO,\n",
         "                curGroup.vertexInterpolation == G_EX_COMPONENT_SKIP &&\n",
         "                    prevGroup.vertexInterpolation == G_EX_COMPONENT_SKIP,\n",
         "                firstCurWorkload.drawData.worldTransformVertexCount(indices.first),\n",
         "                firstPrevWorkload.drawData.worldTransformVertexCount(indices.second));\n",
-        "            if (!tooie::rt64_match::allow_world_pair(autoSkipQuad,\n",
+        "            if (!tooie::rt64_match::allow_world_pair(autoSkipMesh,\n",
         "                    curTransform[3][0], curTransform[3][1], curTransform[3][2],\n",
         "                    prevTransform[3][0], prevTransform[3][1], prevTransform[3][2])) continue;\n",
         "            prevRigidBody = (firstPrevWorkloadMap != nullptr) ? &firstPrevWorkloadMap->transforms[indices.second].rigidBody : nullptr;\n",
@@ -305,6 +337,32 @@
         "                matchCandidates.emplace_back(indices.first, indices.second, matchResult.computeDifference());\n",
         "            }\n",
         "        }\n"
+      ]
+    },
+    {
+      "original_start": 735,
+      "original_end": 736,
+      "original_sha256": "ecc68657f4a49ccd8f9d78fc722672502acd56ef33185a70fdcde7d5ac3034e3",
+      "replacement_lines": [
+        "        // CPU-deformed actor poses require proven per-pair vertex correspondence.\n",
+        "        // Explicit root IDs already include actor, descriptor, scene and geometry.\n",
+        "        const bool cpuActorRoot = curGroup.matrixId >= 0x60000000U &&\n",
+        "            curGroup.matrixId <= 0x7FFFFFFEU;\n",
+        "        // Reused velocity storage must not animate a rejected or unchanged pose.\n",
+        "        if (cpuActorRoot && tooieClearCpuPoseVelocity(curWorkload.drawData, curTransformIndex))\n",
+        "            modifiedBuffers.positionVelocity = true;\n",
+        "        const bool interpolateVertices = curGroup.vertexInterpolation != G_EX_COMPONENT_SKIP &&\n",
+        "            (!cpuActorRoot || tooieCpuPoseCorrespondence(curWorkload.drawData,\n",
+        "                prevWorkload.drawData, curTransformIndex, prevTransformIndex));\n",
+        "        if ((interpolateVertices || (curGroup.texcoordInterpolation == G_EX_COMPONENT_AUTO)) && (curVertexCount == prevVertexCount)) {\n"
+      ]
+    },
+    {
+      "original_start": 742,
+      "original_end": 743,
+      "original_sha256": "d5cebd4fb8aeafb76736186bc7bae08328d7a465ab0ce07f337726a9881e83a9",
+      "replacement_lines": [
+        "            if (interpolateVertices && (curVertexHash != prevVertexHash)) {\n"
       ]
     }
   ]

@@ -159,6 +159,10 @@ extern "C" void tooie_camera_interpolation_observe_active(std::uint32_t handle) 
     tooie::camera_interpolation::observe_active_camera(handle);
 }
 
+extern "C" void tooie_camera_interpolation_request_skip() noexcept {
+    tooie::camera_interpolation::request_skip();
+}
+
 extern "C" bool tooie_camera_interpolation_bind_task(std::uint32_t display_list,
     std::uint32_t display_list_size) noexcept {
     // Both guards bind at the original graphics-task submission seam. Model

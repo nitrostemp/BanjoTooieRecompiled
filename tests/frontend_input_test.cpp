@@ -91,6 +91,16 @@ int main() {
         require(virtual_pad != nullptr, "virtual SDL joystick open failed");
 
         tooie::input::initialize_settings(std::filesystem::temp_directory_path() / "tooie-input-no-legacy");
+        // Each discrete marker press must be delivered, even when the game
+        // thread has not polled between the UI-thread posts.
+        tooie::input::post_issue_marker();
+        tooie::input::post_issue_marker();
+        tooie::input::post_issue_marker();
+        require(tooie::input::consume_issue_marker() &&
+                tooie::input::consume_issue_marker() &&
+                tooie::input::consume_issue_marker() &&
+                !tooie::input::consume_issue_marker(),
+            "multiple issue markers were collapsed before consumption");
         using tooie::input::Action;
         using tooie::input::Device;
         const auto automatic_instance = tooie::input::selected_controller_instance();

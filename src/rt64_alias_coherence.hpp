@@ -99,15 +99,16 @@ inline void tooieRepairSourceMatrixAliases(WorkloadQueue &queue, GameFrame &fram
                     ambiguous = true;
                     break;
                 }
-                if (curData.worldTransformVertexCount(uint32_t(target)) == 4) {
-                    const auto &current = curData.worldTransforms[target];
-                    const auto &previous = prevData.worldTransforms[donorMap.prevTransformIndex];
-                    if (!tooie::rt64_match::allow_world_pair(true,
-                            current[3][0], current[3][1], current[3][2],
-                            previous[3][0], previous[3][1], previous[3][2])) {
-                        ambiguous = true;
-                        break;
-                    }
+                // Target and donor share this source matrix, but may have
+                // different local vertex sequences. Guard the inherited AUTO
+                // history by world travel for every nonempty SKIP target.
+                const auto &current = curData.worldTransforms[target];
+                const auto &donorPreviousRoot = prevData.worldTransforms[donorMap.prevTransformIndex];
+                if (!tooie::rt64_match::allow_world_pair(true,
+                        current[3][0], current[3][1], current[3][2],
+                        donorPreviousRoot[3][0], donorPreviousRoot[3][1], donorPreviousRoot[3][2])) {
+                    ambiguous = true;
+                    break;
                 }
                 if (chosen == count) {
                     chosen = donor;

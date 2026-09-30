@@ -178,6 +178,142 @@ void check_existing_modified_path(bool debugger_camera) {
     }
 }
 
+void check_auxiliary_camera_fallback(float weight, bool ignore, bool mapped,
+    bool different_lens, bool original_main, bool changing_lens = false,
+    bool different_aspect = false, bool auto_narrow_auxiliary = false) {
+    RT64::WorkloadQueue queue;
+    auto &workload = queue.workloads[0];
+    workload.debuggerCamera.enabled = false;
+    workload.fbPairCount = 2;
+    workload.fbPairs.resize(2);
+    auto &pair = workload.fbPairs[0];
+    pair.projectionCount = 2;
+    pair.projections.resize(2);
+    pair.scissorRect = RT64::FixedRect(0, 0, 1280, 960);
+    auto &draw = workload.drawData;
+    auto &old = queue.workloads[1].drawData;
+    for (auto *data : {&draw, &old}) {
+        data->viewTransforms.resize(3);
+        data->projTransforms.resize(3);
+        data->viewProjTransforms.resize(3);
+        data->viewportOrigins.resize(3);
+        data->rspViewports.resize(3);
+        data->viewportClipRatios.resize(12);
+        data->viewProjTransformGroups.resize(3);
+        data->transformGroups.resize(2);
+        data->viewportOrigins[1] = data->viewportOrigins[2] = G_EX_ORIGIN_NONE;
+        for (auto &group : data->transformGroups) {
+            group.matrixId = G_EX_ID_AUTO;
+            group.aspectMode = G_EX_ASPECT_ADJUST;
+        }
+        if (different_aspect) data->transformGroups[1].aspectMode = G_EX_ASPECT_STRETCH;
+        if (auto_narrow_auxiliary) {
+            for (auto &group : data->transformGroups) group.aspectMode = G_EX_ASPECT_AUTO;
+            for (uint32_t index = 1; index <= 2; ++index) {
+                auto &viewport = data->rspViewports[index];
+                viewport.scale = interop::float3(index == 2 ? 80.0f : 160.0f, 120.0f, 1.0f);
+                viewport.translate = interop::float3(160.0f, 120.0f, 0.0f);
+                for (int coordinate = 0; coordinate < 4; ++coordinate)
+                    data->viewportClipRatios[index * 4 + coordinate] = coordinate < 2 ? 1 : -1;
+            }
+        }
+    }
+    hlslpp::float4x4 current = hlslpp::float4x4::identity();
+    hlslpp::float4x4 previous = current;
+    current[3][0] = 20.0f;
+    previous[3][0] = -20.0f;
+    current[0][0] = current[2][2] = std::cos(0.14f);
+    current[0][2] = std::sin(0.14f);
+    current[2][0] = -std::sin(0.14f);
+    hlslpp::float4x4 relative = hlslpp::float4x4::identity();
+    relative[3][0] = -6275.0f;
+    relative[3][1] = -924.0f;
+    relative[3][2] = 2963.0f;
+    hlslpp::float4x4 lens = hlslpp::float4x4::identity();
+    lens[0][0] = 1.25f;
+    lens[1][1] = 1.5f;
+    for (uint32_t index = 1; index <= 2; ++index) {
+        auto &projection = pair.projections[index - 1];
+        projection.type = RT64::Projection::Type::Perspective;
+        projection.transformsIndex = index;
+        projection.gameCallCount = index == 1 ? 100 : 1;
+        projection.scissorRect = pair.scissorRect;
+        draw.viewTransforms[index] = index == 1 ? current : hlslpp::mul(relative, current);
+        old.viewTransforms[index] = index == 1 ? previous : hlslpp::mul(relative, previous);
+        draw.projTransforms[index] = old.projTransforms[index] = lens;
+        if (changing_lens) old.projTransforms[index][1][1] = 1.25f;
+        if (index == 2 && different_lens) draw.projTransforms[index][1][1] = 3.0f;
+        draw.viewProjTransforms[index] = hlslpp::mul(draw.viewTransforms[index], draw.projTransforms[index]);
+        old.viewProjTransforms[index] = hlslpp::mul(old.viewTransforms[index], old.projTransforms[index]);
+        if (index == 2) {
+            draw.viewProjTransforms[index][2][2] += 0.00002f;
+            old.viewProjTransforms[index][2][2] += 0.00002f;
+        }
+        draw.viewProjTransformGroups[index] = index - 1;
+    }
+    draw.transformGroups[1].matrixId = ignore ? G_EX_ID_IGNORE : G_EX_ID_AUTO;
+    draw.transformGroups[0].matrixId = original_main ? G_EX_ID_IGNORE : G_EX_ID_AUTO;
+    RT64::GameFrame frame, previous_frame;
+    frame.workloads.push_back(0);
+    frame.frameMap.workloads.resize(1);
+    auto &map = frame.frameMap.workloads[0];
+    map.mapped = true;
+    map.prevWorkloadIndex = 1;
+    map.viewProjections.resize(3);
+    for (uint32_t index = 1; index <= 2; ++index) {
+        auto &entry = map.viewProjections[index];
+        entry.mapped = index == 1 || mapped;
+        entry.prevTransformIndex = index;
+        entry.rigidBody.lerpDecompose = false;
+        entry.rigidBody.lerpTranslation = true;
+        entry.rigidBody.lerpRotation = true;
+        entry.rigidBody.updateLinear(old.viewTransforms[index], draw.viewTransforms[index], G_EX_COMPONENT_INTERPOLATE);
+    }
+    frame.perspectiveScenes.resize(1);
+    // Visit the auxiliary first: fallback must not depend on scene order.
+    // Captured feathers use a later framebuffer pair than the main scene.
+    workload.fbPairs[1].projectionCount = 2;
+    workload.fbPairs[1].projections.push_back(pair.projections[1]);
+    workload.fbPairs[1].projections.push_back(pair.projections[1]);
+    workload.fbPairs[1].scissorRect = pair.scissorRect;
+    pair.projectionCount = 1;
+    frame.perspectiveScenes[0].projections.push_back({0, 1, 0});
+    frame.perspectiveScenes[0].projections.push_back({0, 1, 1});
+    frame.perspectiveScenes[0].projections.push_back({0, 0, 0});
+    RT64::ProjectionProcessor processor;
+    RT64::ProjectionProcessor::ProcessParams params;
+    params.workloadQueue = &queue;
+    params.curFrame = &frame;
+    params.prevFrame = &previous_frame;
+    params.curFrameWeight = weight;
+    params.prevFrameWeight = 0.25f;
+    params.aspectRatioScale = 2.0f;
+    processor.process(params);
+    for (int endpoint = 0; endpoint < 2; ++endpoint) {
+        const auto &actual = endpoint ? draw.prevViewProjTransforms[2] : draw.modViewProjTransforms[2];
+        const bool expected_smooth = !ignore && !different_lens && !original_main &&
+            !different_aspect && !auto_narrow_auxiliary;
+        hlslpp::float4x4 expected = expected_smooth
+            ? hlslpp::mul(relative, endpoint ? draw.prevViewProjTransforms[1] : draw.modViewProjTransforms[1])
+            : hlslpp::float4x4(draw.viewProjTransforms[2]);
+        if (!expected_smooth && !different_aspect && !auto_narrow_auxiliary)
+            for (int row = 0; row < 4; ++row) expected[row][0] *= 0.5f;
+        if (expected_smooth) expected[2][2] += 0.00002f;
+        for (int row = 0; row < 4; ++row) for (int col = 0; col < 4; ++col) {
+            if (std::abs(actual[row][col] - expected[row][col]) > 0.001f)
+                throw std::runtime_error("auxiliary lost coherent camera interpolation or bypassed opt-out");
+        }
+        if (expected_smooth) {
+            const auto &actualProjection = endpoint ? draw.prevProjTransforms[2] : draw.modProjTransforms[2];
+            const auto &mainProjection = endpoint ? draw.prevProjTransforms[1] : draw.modProjTransforms[1];
+            for (int row = 0; row < 4; ++row) for (int col = 0; col < 4; ++col) {
+                if (std::abs(actualProjection[row][col] - mainProjection[row][col]) > 0.001f)
+                    throw std::runtime_error("auxiliary lens did not follow the mapped camera lens");
+            }
+        }
+    }
+}
+
 } // namespace
 
 int main() {
@@ -193,6 +329,17 @@ int main() {
         check_case(good_view_projection, G_EX_ASPECT_ADJUST, 4.0f / 3.0f, false);
         check_existing_modified_path(true);
         check_existing_modified_path(false);
+        for (float weight : {0.0f, 0.5f, 1.0f})
+            check_auxiliary_camera_fallback(weight, false, false, false, false);
+        // A current auxiliary lens matches the current main lens even while
+        // the mapped main projection interpolates from the previous lens.
+        check_auxiliary_camera_fallback(0.25f, false, false, false, false, true);
+        check_auxiliary_camera_fallback(0.5f, true, false, false, false);
+        check_auxiliary_camera_fallback(0.5f, false, false, true, false);
+        check_auxiliary_camera_fallback(0.5f, false, false, false, true);
+        check_auxiliary_camera_fallback(0.5f, false, true, false, false);
+        check_auxiliary_camera_fallback(0.5f, false, false, false, false, false, true);
+        check_auxiliary_camera_fallback(0.5f, false, false, false, false, false, false, true);
         return 0;
     }
     catch (const std::exception &error) {
