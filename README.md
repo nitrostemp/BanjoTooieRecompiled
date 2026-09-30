@@ -5,6 +5,10 @@ through static recompilation, with rendering powered by
 [RT64](https://github.com/rt64/rt64). The game and assets are not included. You
 must provide your own supported copy of the game.
 
+[View screenshots](SCREENSHOTS.md)
+
+[YouTube channel](https://www.youtube.com/@some-scurvy-dog)
+
 ## Alpha status
 
 Windows x64 alpha releases are available. Apple Silicon/macOS and Linux builds
