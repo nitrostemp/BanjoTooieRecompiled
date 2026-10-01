@@ -41,6 +41,20 @@ jobs:
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
 
+      - name: Get the ROM
+        env:
+          ROM_REPO: ${{ secrets.ROM_REPO }}
+          ROM_REPO_TOKEN: ${{ secrets.ROM_REPO_TOKEN }}
+          ROM_PATH: ${{ vars.ROM_PATH || 'baserom.us.z64' }}
+        run: |
+          if [ -z "$ROM_REPO" ] || [ -z "$ROM_REPO_TOKEN" ]; then
+            echo "::error::Add the ROM_REPO and ROM_REPO_TOKEN secrets (see the top of this workflow)."
+            exit 1
+          fi
+          # Outside the checkout, so the source tree stays clean for packaging.
+          git clone -q --depth 1 "https://x-access-token:$ROM_REPO_TOKEN@github.com/$ROM_REPO.git" "$RUNNER_TEMP/rom-src"
+          echo "TOOIE_ROM=$RUNNER_TEMP/rom-src/$ROM_PATH" >> "$GITHUB_ENV"
+
       - name: Create the draft release
         id: release
         run: |
@@ -56,20 +70,6 @@ jobs:
               --notes "Test build of $GITHUB_SHA (not published)."
           fi
           echo "tag=$tag" >> "$GITHUB_OUTPUT"
-
-      - name: Get the ROM
-        env:
-          ROM_REPO: ${{ secrets.ROM_REPO }}
-          ROM_REPO_TOKEN: ${{ secrets.ROM_REPO_TOKEN }}
-          ROM_PATH: ${{ vars.ROM_PATH || 'baserom.us.z64' }}
-        run: |
-          if [ -z "$ROM_REPO" ] || [ -z "$ROM_REPO_TOKEN" ]; then
-            echo "::error::Add the ROM_REPO and ROM_REPO_TOKEN secrets (see the top of this workflow)."
-            exit 1
-          fi
-          # Outside the checkout, so the source tree stays clean for packaging.
-          git clone -q --depth 1 "https://x-access-token:$ROM_REPO_TOKEN@github.com/$ROM_REPO.git" "$RUNNER_TEMP/rom-src"
-          echo "TOOIE_ROM=$RUNNER_TEMP/rom-src/$ROM_PATH" >> "$GITHUB_ENV"
 
       - name: Install tools
         run: |

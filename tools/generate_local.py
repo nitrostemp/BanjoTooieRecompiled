@@ -141,10 +141,20 @@ def materialize_macos_codegen_tools(deps: Path, decomp: Path) -> None:
         raise RuntimeError(f"materialized codegen tools are incomplete: {missing}")
 
 
+def build_recompilers(source: Path, jobs: int, env: dict[str, str] | None) -> tuple[Path, Path]:
+    build = source / "build"
+    # CMake's incremental configure/build safely verifies or refreshes this stage.
+    run(["cmake", "-S", source, "-B", build, "-DCMAKE_BUILD_TYPE=Release"], env=env)
+    run(["cmake", "--build", build, "--parallel", str(jobs)], env=env)
+    return executable(build, "N64Recomp"), executable(build, "RSPRecomp")
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--rom", required=True, type=Path,
+    parser.add_argument("--rom", type=Path,
                         help="user-owned NTSC-U big-endian Banjo-Tooie ROM")
+    parser.add_argument("--toolchain-only", action="store_true",
+                        help="prepare and build every tool that needs no ROM, then stop")
     parser.add_argument("--deps-dir", type=Path, default=ROOT / "deps")
     parser.add_argument("--jobs", type=int, default=max(1, os.cpu_count() or 1))
     parser.add_argument("--evidence", type=Path, default=ROOT / ".local-evidence")
@@ -158,12 +168,15 @@ def main() -> int:
         raise RuntimeError("Run this pipeline inside Linux/WSL; pass the ROM through a mounted path")
     if args.jobs < 1:
         parser.error("--jobs must be at least 1")
+    if args.toolchain_only == (args.rom is not None):
+        parser.error("pass either --rom PATH or --toolchain-only")
 
-    rom = args.rom.expanduser().resolve()
     deps = args.deps_dir.expanduser().resolve()
     evidence = args.evidence.expanduser().resolve()
-    # Validate the user's source before creating or replacing any local ROM input.
-    original_sha = require_hash(rom, ROM_SHA256, "NTSC-U ROM")
+    if not args.toolchain_only:
+        rom = args.rom.expanduser().resolve()
+        # Validate the user's source before creating or replacing any local ROM input.
+        original_sha = require_hash(rom, ROM_SHA256, "NTSC-U ROM")
 
     env = macos_environment() if MACOS else None
     make = "gmake" if MACOS else "make"
@@ -185,7 +198,9 @@ def main() -> int:
     else:
         materialize_codegen_tools(deps, decomp)
     local_rom = decomp / "baserom.us.z64"
-    if local_rom.exists():
+    if args.toolchain_only:
+        pass
+    elif local_rom.exists():
         require_hash(local_rom, ROM_SHA256, "existing decomp ROM")
     else:
         local_rom.parent.mkdir(parents=True, exist_ok=True)
@@ -209,6 +224,21 @@ def main() -> int:
         pip_command.extend(["-r", requirement])
     run(pip_command, env=env)
 
+    # ultralib needs no ROM. On macOS it is archived with GNU ar: macOS ar
+    # cannot index MIPS ELF members, and AR must not reach host-tool builds.
+    ultralib_command = [make, "-C", "lib/ultralib", "VERSION=J", "TARGET=libultra_rom",
+                        "NON_MATCHING=1", f"-j{args.jobs}"]
+    if MACOS:
+        ultralib_command.append("AR=mips-linux-gnu-ar")
+    if args.toolchain_only:
+        # The ROM-free part of the decomp's `make setup`, then ultralib.
+        run([make, "-C", "lib/ultralib", "setup", "NON_MATCHING=1"], cwd=decomp, env=env)
+        run([make, "-C", "tools", f"-j{args.jobs}"], cwd=decomp, env=env)
+        run(ultralib_command, cwd=decomp, env=env)
+        build_recompilers(n64recomp_source, args.jobs, env)
+        print("codegen toolchain ready; rerun with --rom PATH to generate source", flush=True)
+        return 0
+
     decompressed = decomp / "decompressed.us.z64"
     rebuilt = decomp / "build/us/banjotooie_decompressed.z64"
     elf = decomp / "build/us/banjotooie_decompressed.elf"
@@ -223,11 +253,7 @@ def main() -> int:
         make_var = f"PYTHON3_BIN={venv_python}"
         run([make, "setup", make_var], cwd=decomp, env=env)
         if MACOS:
-            # Build ultralib first with GNU ar: macOS ar cannot index MIPS ELF
-            # members, and AR must not reach the decomp's host-tool builds.
-            run([make, "-C", "lib/ultralib", "VERSION=J", "TARGET=libultra_rom",
-                 "NON_MATCHING=1", "AR=mips-linux-gnu-ar", f"-j{args.jobs}"],
-                cwd=decomp, env=env)
+            run(ultralib_command, cwd=decomp, env=env)
         run([make, f"-j{args.jobs}", make_var], cwd=decomp, env=env)
     require_hash(decompressed, DECOMP_SHA256, "canonical decompressed ROM")
     require_hash(rebuilt, DECOMP_SHA256, "rebuilt decompressed ROM")
@@ -236,13 +262,7 @@ def main() -> int:
     if not elf.is_file():
         raise FileNotFoundError(elf)
 
-    codegen_build = n64recomp_source / "build"
-    # CMake's incremental configure/build safely verifies or refreshes this stage.
-    run(["cmake", "-S", n64recomp_source, "-B", codegen_build,
-         "-DCMAKE_BUILD_TYPE=Release"], env=env)
-    run(["cmake", "--build", codegen_build, "--parallel", str(args.jobs)], env=env)
-    n64recomp = executable(codegen_build, "N64Recomp")
-    rsp_recomp = executable(codegen_build, "RSPRecomp")
+    n64recomp, rsp_recomp = build_recompilers(n64recomp_source, args.jobs, env)
 
     evidence.mkdir(parents=True, exist_ok=True)
     cpu_command: list[object] = [venv_python, ROOT / "tools/prepare_codegen.py",

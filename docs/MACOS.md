@@ -30,6 +30,18 @@ python3 tools/bootstrap_dependencies.py
 On macOS the bootstrap also fetches the pinned macOS build of the IDO 5.3
 static recompilation (`ido_53_macos` in `dependencies.lock.json`).
 
+## Check the toolchain without a ROM
+
+```bash
+python3 tools/generate_local.py --toolchain-only
+python3 tests/macos_assembler_shim_test.py
+```
+
+This prepares and builds every code generation tool that needs no ROM (IDO,
+the decompilation's host tools, ultralib and the recompilers), then checks the
+assembler driver against known instruction encodings. The `macos-toolchain`
+job in `.github/workflows/source-checks.yml` runs the same steps on every push.
+
 ## Verify your ROM and generate local source
 
 Place your own NTSC-U big-endian ROM at the ignored `baserom.us.z64` path and
