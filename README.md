@@ -11,8 +11,19 @@ must provide your own supported copy of the game.
 
 ## Alpha status
 
-Windows x64 alpha releases are available. Apple Silicon/macOS and Linux builds
-are not ready.
+Windows x64 alpha releases are available. This fork adds an Apple Silicon
+macOS build, rendered with Metal; Linux builds are not ready.
+
+### macOS
+
+Download the macOS ZIP from
+[this fork's Releases page](https://github.com/nitrostemp/BanjoTooieRecompiled/releases),
+unzip it and open `BanjoTooieRecompiled.app` (Apple Silicon, macOS 15 or later).
+The app is not signed with an Apple developer ID, so the first time macOS blocks
+it: choose **Open Anyway** in **System Settings > Privacy & Security**. Then pick
+your ROM as described below. Saves, settings and logs are kept in
+`~/Library/Application Support/BanjoTooieRecompiled`. Report macOS-specific
+problems to this fork.
 
 ## Download and install
 
@@ -115,7 +126,8 @@ their own terms. No game ROM or extracted game assets are included. Read
 
 ## Build from source
 
-The [Windows build guide](docs/WINDOWS.md) is for developers. It covers source
+The [Windows build guide](docs/WINDOWS.md) and [macOS build guide](docs/MACOS.md)
+are for developers. It covers source
 generation and the native Windows build; these development tools are not player
 requirements. See [generation details](docs/CODEGEN.md) for how a user-provided
 ROM is used locally, and [architecture](docs/ARCHITECTURE.md) for an overview.

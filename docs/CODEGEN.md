@@ -62,5 +62,6 @@ Both scripts fail closed on source/ROM identity drift. `prepare_codegen.py` deri
 The supported clean-checkout path regenerates `native_fixture.h`, the boot references, and the IPL3 shape header directly from the validated local inputs; it does not read any other workspace.
 
 These commands describe the Linux/WSL generation workflow used for the Windows
-build. Native generation on other hosts is not documented here yet. ROMs,
+build. The same orchestrator runs natively on Apple Silicon macOS with macOS
+substitutes for the Linux tools; see [MACOS.md](MACOS.md). ROMs,
 generated code/data and generation receipts remain local and excluded from Git.
