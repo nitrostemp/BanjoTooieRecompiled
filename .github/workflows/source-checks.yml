@@ -10,3 +10,18 @@ jobs:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
       - name: Check source syntax, dependency pins, and upload exclusions
         run: python3 tools/check_repository.py
+  macos-toolchain:
+    # Every macOS code generation tool that needs no ROM: the pinned macOS IDO,
+    # the decomp's host tools, ultralib with MIPS binutils, the recompilers and
+    # the assembler driver shim. Building the game itself needs a ROM; see
+    # release-macos.yml.
+    runs-on: macos-15
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - name: Install tools
+        run: brew install ninja make mips-linux-gnu-binutils fmt
+      - name: Prepare the code generation toolchain
+        run: python3 tools/generate_local.py --toolchain-only --jobs "$(sysctl -n hw.ncpu)"
+      - name: Check the assembler driver shim
+        run: python3 tests/macos_assembler_shim_test.py
