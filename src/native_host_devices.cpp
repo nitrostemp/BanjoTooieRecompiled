@@ -1604,7 +1604,7 @@ void initialize(const Options& options) {
     if (options.frontend) sdl_flags |= SDL_INIT_GAMECONTROLLER | SDL_INIT_JOYSTICK | SDL_INIT_HAPTIC;
     sdl_require(SDL_Init(sdl_flags) == 0, "SDL_Init");
     if (options.frontend) {
-        const auto controller_db = platform::executable_path().parent_path() / "recompcontrollerdb.txt";
+        const auto controller_db = platform::resource_directory() / "recompcontrollerdb.txt";
         const int mappings = SDL_GameControllerAddMappingsFromFile(controller_db.string().c_str());
         log("frontend_controller_mappings", {{"path", controller_db.string()}, {"loaded", mappings},
             {"success", mappings >= 0}, {"error", mappings < 0 ? SDL_GetError() : ""}});

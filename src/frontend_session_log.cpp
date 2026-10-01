@@ -117,7 +117,8 @@ void Writer::rotate_locked() {
     flush_locked();
     if (failed_) return;
     for (unsigned index = retained_files_; index > 0; --index) {
-        const auto source = index == 1 ? path_ : path_.string() + "." + std::to_string(index - 1);
+        const auto source = index == 1 ? path_
+            : std::filesystem::path(path_.string() + "." + std::to_string(index - 1));
         const auto target = path_.string() + "." + std::to_string(index);
         std::error_code error;
         const bool source_exists = std::filesystem::exists(source, error);

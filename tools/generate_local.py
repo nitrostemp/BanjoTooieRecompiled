@@ -17,6 +17,9 @@ from typing import Sequence
 ROOT = Path(__file__).resolve().parents[1]
 ROM_SHA256 = "9ec37fba6890362eba86fb855697a9cff1519275531b172083a1a6a045483583"
 DECOMP_SHA256 = "8c9d316b2edca686ec8393ddf95d480a7dfd9879ef434dbcfc4ea3000f2ffe89"
+MACOS = sys.platform == "darwin"
+# GCC-only ultralib tools are never invoked for the IDO libultra_rom target.
+MACOS_UNUSED_GCC_TOOLS = ("ar", "gcc", "strip-2.7")
 
 
 def sha256(path: Path) -> str:
@@ -42,10 +45,32 @@ def validate_pinned_hashes() -> None:
             raise RuntimeError(f"invalid pinned SHA-256 literal {label}: {value!r}")
 
 
-def run(command: Sequence[object], *, cwd: Path = ROOT) -> None:
+def run(command: Sequence[object], *, cwd: Path = ROOT, env: dict[str, str] | None = None) -> None:
     printable = [str(value) for value in command]
     print("+", " ".join(printable), flush=True)
-    subprocess.run(printable, cwd=cwd, check=True)
+    subprocess.run(printable, cwd=cwd, check=True, env=env)
+
+
+def macos_environment() -> dict[str, str]:
+    """Host tools for the Linux-oriented decomp Makefiles on macOS."""
+    missing = [tool for tool in ("gmake", "mips-linux-gnu-as", "mips-linux-gnu-ld",
+                                 "mips-linux-gnu-objcopy", "mips-linux-gnu-ar")
+               if shutil.which(tool) is None]
+    if missing:
+        raise RuntimeError(f"missing macOS codegen tools {missing}; "
+                           "run: brew install make mips-linux-gnu-binutils fmt")
+    env = dict(os.environ)
+    # The assembler-driver shim stands in for mips-linux-gnu-gcc.
+    env["PATH"] = os.pathsep.join([str(ROOT / "tools/macos"), env.get("PATH", "")])
+    # Apple's clang finds the macOS SDK, whatever other clang is first on PATH.
+    env["CC"] = "/usr/bin/clang"
+    env["CXX"] = "/usr/bin/clang++"
+    brew_prefix = subprocess.run(["brew", "--prefix"], text=True, capture_output=True)
+    if brew_prefix.returncode == 0 and brew_prefix.stdout.strip():
+        library = str(Path(brew_prefix.stdout.strip()) / "lib")
+        env["LIBRARY_PATH"] = os.pathsep.join(
+            path for path in (library, env.get("LIBRARY_PATH", "")) if path)
+    return env
 
 
 def executable(build: Path, name: str) -> Path:
@@ -95,6 +120,27 @@ def materialize_codegen_tools(deps: Path, decomp: Path) -> None:
         raise RuntimeError(f"materialized codegen tools are incomplete: {missing}")
 
 
+def materialize_macos_codegen_tools(deps: Path, decomp: Path) -> None:
+    """Install the verified macOS IDO; the decomp's IDO build needs no MIPS GCC."""
+    ido = deps / "codegen-tools/ido-5.3-recomp-macos"
+    copy_tool_tree(ido, decomp / "tools/ido")
+    copy_tool_tree(ido, decomp / "lib/ultralib/tools/ido")
+    # ultralib's tool setup requires these files to exist, but only libgultra
+    # targets run them. Fail loudly if that ever changes.
+    gcc_tools = decomp / "lib/ultralib/tools/gcc"
+    gcc_tools.mkdir(parents=True, exist_ok=True)
+    for name in MACOS_UNUSED_GCC_TOOLS:
+        placeholder = gcc_tools / name
+        placeholder.write_text(
+            "#!/bin/sh\necho \"$0: GCC 2.7.2 tools are not installed on macOS "
+            "(only libgultra targets use them)\" >&2\nexit 1\n", encoding="utf-8")
+        placeholder.chmod(0o755)
+    required = [decomp / "tools/ido/cc", decomp / "lib/ultralib/tools/ido/cc"]
+    missing = [str(path) for path in required if not path.is_file()]
+    if missing:
+        raise RuntimeError(f"materialized codegen tools are incomplete: {missing}")
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--rom", required=True, type=Path,
@@ -119,9 +165,14 @@ def main() -> int:
     # Validate the user's source before creating or replacing any local ROM input.
     original_sha = require_hash(rom, ROM_SHA256, "NTSC-U ROM")
 
-    dependency_keys = ["banjo_tooie_decomp", "n64recomp_codegen", "ido_53_linux",
-                       "mips_binutils_26_linux", "mips_gcc_272_linux",
-                       "mips_binutils_27_linux"]
+    env = macos_environment() if MACOS else None
+    make = "gmake" if MACOS else "make"
+    if MACOS:
+        dependency_keys = ["banjo_tooie_decomp", "n64recomp_codegen", "ido_53_macos"]
+    else:
+        dependency_keys = ["banjo_tooie_decomp", "n64recomp_codegen", "ido_53_linux",
+                           "mips_binutils_26_linux", "mips_gcc_272_linux",
+                           "mips_binutils_27_linux"]
     bootstrap_command: list[object] = [sys.executable, ROOT / "tools/bootstrap_dependencies.py",
                                        "--deps-dir", deps]
     for key in dependency_keys:
@@ -129,7 +180,10 @@ def main() -> int:
     run(bootstrap_command)
     decomp = deps / "banjo-tooie"
     n64recomp_source = deps / "N64Recomp-codegen"
-    materialize_codegen_tools(deps, decomp)
+    if MACOS:
+        materialize_macos_codegen_tools(deps, decomp)
+    else:
+        materialize_codegen_tools(deps, decomp)
     local_rom = decomp / "baserom.us.z64"
     if local_rom.exists():
         require_hash(local_rom, ROM_SHA256, "existing decomp ROM")
@@ -141,7 +195,7 @@ def main() -> int:
     venv = ROOT / ".venv-codegen"
     venv_python = venv / "bin/python"
     if not venv_python.is_file():
-        run([sys.executable, "-m", "venv", venv])
+        run([sys.executable, "-m", "venv", venv], env=env)
     requirements = [ROOT / "tools/requirements-codegen.txt",
                     decomp / "tools/requirements.txt",
                     decomp / "tools/splat/requirements.txt"]
@@ -153,7 +207,7 @@ def main() -> int:
     pip_command: list[object] = [venv_python, "-m", "pip", "install"]
     for requirement in requirements:
         pip_command.extend(["-r", requirement])
-    run(pip_command)
+    run(pip_command, env=env)
 
     decompressed = decomp / "decompressed.us.z64"
     rebuilt = decomp / "build/us/banjotooie_decompressed.z64"
@@ -167,8 +221,14 @@ def main() -> int:
         print("verified existing decomp outputs; skipping decomp build", flush=True)
     else:
         make_var = f"PYTHON3_BIN={venv_python}"
-        run(["make", "setup", make_var], cwd=decomp)
-        run(["make", f"-j{args.jobs}", make_var], cwd=decomp)
+        run([make, "setup", make_var], cwd=decomp, env=env)
+        if MACOS:
+            # Build ultralib first with GNU ar: macOS ar cannot index MIPS ELF
+            # members, and AR must not reach the decomp's host-tool builds.
+            run([make, "-C", "lib/ultralib", "VERSION=J", "TARGET=libultra_rom",
+                 "NON_MATCHING=1", "AR=mips-linux-gnu-ar", f"-j{args.jobs}"],
+                cwd=decomp, env=env)
+        run([make, f"-j{args.jobs}", make_var], cwd=decomp, env=env)
     require_hash(decompressed, DECOMP_SHA256, "canonical decompressed ROM")
     require_hash(rebuilt, DECOMP_SHA256, "rebuilt decompressed ROM")
     if decompressed.read_bytes() != rebuilt.read_bytes():
@@ -179,8 +239,8 @@ def main() -> int:
     codegen_build = n64recomp_source / "build"
     # CMake's incremental configure/build safely verifies or refreshes this stage.
     run(["cmake", "-S", n64recomp_source, "-B", codegen_build,
-         "-DCMAKE_BUILD_TYPE=Release"])
-    run(["cmake", "--build", codegen_build, "--parallel", str(args.jobs)])
+         "-DCMAKE_BUILD_TYPE=Release"], env=env)
+    run(["cmake", "--build", codegen_build, "--parallel", str(args.jobs)], env=env)
     n64recomp = executable(codegen_build, "N64Recomp")
     rsp_recomp = executable(codegen_build, "RSPRecomp")
 

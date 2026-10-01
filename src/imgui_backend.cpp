@@ -6,6 +6,9 @@
 #include "imgui_menu.hpp"
 #include "frontend_input_preference.hpp"
 #include "platform_support.hpp"
+#ifdef __APPLE__
+#include "imgui_backend_metal.hpp"
+#endif
 
 #include <algorithm>
 #include <atomic>
@@ -22,6 +25,11 @@ std::atomic<SDL_Window*> s_window{nullptr};
 std::mutex s_events_mutex;
 std::deque<SDL_Event> s_events;
 std::unique_ptr<RT64::Inspector> s_inspector;
+#ifdef __APPLE__
+bool s_metal = false;
+#else
+constexpr bool s_metal = false;
+#endif
 bool s_reset_input = false;
 bool s_was_suppressed = false;
 std::atomic<bool> s_gamepad_connected{false};
@@ -69,7 +77,7 @@ void apply_gamepad() {
 }
 
 void load_player_font() {
-    const auto path = tooie::platform::executable_path().parent_path() / "assets" / "InterVariable.ttf";
+    const auto path = tooie::platform::resource_directory() / "assets" / "InterVariable.ttf";
     std::ifstream file(path, std::ios::binary | std::ios::ate);
     if (!file) return; // ImGui's built-in font keeps startup usable.
     const auto bytes = static_cast<std::streamoff>(file.tellg());
@@ -81,6 +89,15 @@ void load_player_font() {
         return;
     }
     ImGui::GetIO().Fonts->AddFontFromMemoryTTF(data, static_cast<int>(bytes), 18.0f);
+}
+
+void configure_player_menu() {
+    // Persist player preferences in project config, not imgui.ini.
+    ImGui::GetIO().IniFilename = nullptr;
+    ImGui::GetIO().ConfigFlags |= ImGuiConfigFlags_NavEnableKeyboard |
+                                   ImGuiConfigFlags_NavEnableGamepad |
+                                   ImGuiConfigFlags_NoMouseCursorChange;
+    load_player_font();
 }
 }
 
@@ -114,25 +131,30 @@ void set_gamepad_state(MenuGamepadState state) noexcept {
 
 void initialize(plume::RenderDevice* device, const plume::RenderSwapChain* swap_chain,
                 RT64::UserConfiguration::GraphicsAPI api) {
+    SDL_Window* window = s_window.load(std::memory_order_acquire);
+#ifdef __APPLE__
+    if (api == RT64::UserConfiguration::GraphicsAPI::Metal) {
+        if (window && device && swap_chain) {
+            s_metal = metal::initialize(device, window);
+            if (s_metal) configure_player_menu();
+            else std::fputs("ImGui player menu: Metal renderer initialization failed.\n", stderr);
+        }
+        return;
+    }
+#endif
     if (api != RT64::UserConfiguration::GraphicsAPI::D3D12 &&
         api != RT64::UserConfiguration::GraphicsAPI::Vulkan) {
         std::fputs("ImGui player menu: this RT64 graphics API has no Inspector backend.\n", stderr);
         return;
     }
-    SDL_Window* window = s_window.load(std::memory_order_acquire);
     if (window && device && swap_chain) {
         s_inspector = std::make_unique<RT64::Inspector>(device, swap_chain, api, window);
-        // Persist player preferences in project config, not imgui.ini.
-        ImGui::GetIO().IniFilename = nullptr;
-        ImGui::GetIO().ConfigFlags |= ImGuiConfigFlags_NavEnableKeyboard |
-                                       ImGuiConfigFlags_NavEnableGamepad |
-                                       ImGuiConfigFlags_NoMouseCursorChange;
-        load_player_font();
+        configure_player_menu();
     }
 }
 
 void draw(RT64::RenderWorker* worker, plume::RenderCommandList* command_list) {
-    if (!s_inspector || !worker || !command_list) return;
+    if ((!s_inspector && !s_metal) || !worker || !command_list) return;
     std::deque<SDL_Event> events;
     bool reset_input = false;
     {
@@ -147,9 +169,20 @@ void draw(RT64::RenderWorker* worker, plume::RenderCommandList* command_list) {
     for (SDL_Event& event : events) {
         if (suppressed &&
             (event.type == SDL_KEYDOWN || event.type == SDL_KEYUP || event.type == SDL_TEXTINPUT)) continue;
+#ifdef __APPLE__
+        if (s_metal) { metal::process_event(event); continue; }
+#endif
         s_inspector->handleSdlEvent(&event);
     }
     apply_gamepad();
+#ifdef __APPLE__
+    if (s_metal) {
+        metal::new_frame(command_list);
+        tooie::menu::draw();
+        metal::render(command_list);
+        return;
+    }
+#endif
     s_inspector->newFrame(worker);
     tooie::menu::draw();
     s_inspector->endFrame();
@@ -158,6 +191,10 @@ void draw(RT64::RenderWorker* worker, plume::RenderCommandList* command_list) {
 
 void renderer_shutdown() noexcept {
     s_inspector.reset();
+#ifdef __APPLE__
+    if (s_metal) metal::shutdown();
+    s_metal = false;
+#endif
     std::lock_guard lock(s_events_mutex);
     s_events.clear();
     s_reset_input = false;

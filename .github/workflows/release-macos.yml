@@ -1,0 +1,101 @@
+# Builds the Apple Silicon macOS package. Players still supply their own ROM in
+# the launcher; the package contains no ROM.
+#
+# The game's code is recompiled from the ROM, so building needs one. The
+# workflow reads it from a private repository. Setup, once:
+#   1. Make a private repository holding your NTSC-U 1.0 Banjo-Tooie ROM.
+#   2. Make a fine-grained personal access token with read-only "Contents"
+#      access to that repository alone.
+#   3. In this repository's Settings > Secrets and variables > Actions, add the
+#      secrets ROM_REPO (owner/name of the private repository) and
+#      ROM_REPO_TOKEN (the token). If the ROM is not baserom.us.z64 at that
+#      repository's root, add the variable ROM_PATH with its path there.
+#
+# A pushed tag such as v0.1.0-alpha.3-mac builds into a draft release, which is
+# published once the package is uploaded. Run by hand from the Actions tab, it
+# builds into a draft "Test build" release. Drafts are visible only to the
+# repository's collaborators. There is no pull request trigger, so the ROM token
+# is never exposed to code from forks.
+name: release-macos
+
+on:
+  push:
+    tags: ['v*']
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: release-macos-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  macos:
+    # Apple Silicon. The bundled Homebrew libraries cannot run on a macOS older
+    # than the runner's, so build on the oldest supported image.
+    runs-on: macos-15
+    timeout-minutes: 180
+    env:
+      GH_TOKEN: ${{ github.token }}
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+
+      - name: Create the draft release
+        id: release
+        run: |
+          if [ "$GITHUB_REF_TYPE" = tag ]; then
+            tag=$GITHUB_REF_NAME
+            gh release view "$tag" >/dev/null 2>&1 ||
+              gh release create "$tag" --draft --verify-tag \
+                --title "Banjo-Tooie: Recompiled $tag (macOS)" --notes "Building..."
+          else
+            tag=test-build-$GITHUB_RUN_NUMBER
+            gh release create "$tag" --draft --target "$GITHUB_SHA" \
+              --title "Test build $GITHUB_RUN_NUMBER (macOS)" \
+              --notes "Test build of $GITHUB_SHA (not published)."
+          fi
+          echo "tag=$tag" >> "$GITHUB_OUTPUT"
+
+      - name: Get the ROM
+        env:
+          ROM_REPO: ${{ secrets.ROM_REPO }}
+          ROM_REPO_TOKEN: ${{ secrets.ROM_REPO_TOKEN }}
+          ROM_PATH: ${{ vars.ROM_PATH || 'baserom.us.z64' }}
+        run: |
+          if [ -z "$ROM_REPO" ] || [ -z "$ROM_REPO_TOKEN" ]; then
+            echo "::error::Add the ROM_REPO and ROM_REPO_TOKEN secrets (see the top of this workflow)."
+            exit 1
+          fi
+          # Outside the checkout, so the source tree stays clean for packaging.
+          git clone -q --depth 1 "https://x-access-token:$ROM_REPO_TOKEN@github.com/$ROM_REPO.git" "$RUNNER_TEMP/rom-src"
+          echo "TOOIE_ROM=$RUNNER_TEMP/rom-src/$ROM_PATH" >> "$GITHUB_ENV"
+
+      - name: Install tools
+        run: |
+          brew install ninja make mips-linux-gnu-binutils fmt sdl2-compat sdl3 openssl@3
+          # Xcode 26 and later download the Metal compiler separately.
+          xcrun -sdk macosx metal --version || xcodebuild -downloadComponent MetalToolchain
+
+      - name: Fetch pinned dependencies
+        run: python3 tools/bootstrap_dependencies.py
+
+      - name: Generate code from the ROM
+        run: python3 tools/generate_local.py --rom "$TOOIE_ROM" --jobs "$(sysctl -n hw.ncpu)"
+
+      - name: Build
+        run: |
+          cmake --preset macos-arm64 -DTOOIE_PERSISTENT_RUNTIME_EXPERIMENT=ON
+          cmake --build --preset macos-arm64
+
+      - name: Package
+        run: python3 tools/package_macos.py --label "${{ steps.release.outputs.tag }}"
+
+      - name: Upload to the release
+        run: |
+          gh release upload "${{ steps.release.outputs.tag }}" dist/macos/*.zip \
+            dist/macos/package-manifest.json --clobber
+
+      - name: Publish the release
+        if: github.ref_type == 'tag'
+        run: gh release edit "$GITHUB_REF_NAME" --draft=false --notes-file release/macos-notes.md

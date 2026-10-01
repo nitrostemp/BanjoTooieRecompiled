@@ -1,0 +1,59 @@
+{
+  "schema": 1,
+  "candidateVersion": "0.1.0-alpha.3",
+  "reviewRule": "The app bundle is assembled by tools/package_macos.py from the build: the executable, Resources (assets, runtime-data/{identity}, recompcontrollerdb.txt) and the Homebrew libraries it links. These files sit beside the app. README.md is built from release/README.macos.md. Bundled library licenses are copied from their Homebrew kegs into third_party/notices/bundled/.",
+  "files": [
+    "README.md",
+    "LICENSE",
+    "THIRD_PARTY_NOTICES.md",
+    "docs/PLAYER_GUIDE.md",
+    "docs/RELEASE_NOTES.md",
+    "third_party/notices/concurrentqueue-BSD-header-notice.txt",
+    "third_party/notices/concurrentqueue-Preshing-zlib-header-notice.txt",
+    "third_party/notices/fmt-MIT.txt",
+    "third_party/notices/FONT_COPYRIGHTS.txt",
+    "third_party/notices/miniz.txt",
+    "third_party/notices/N64ModernRuntime-GPL-3.0.txt",
+    "third_party/notices/N64Recomp-MIT.txt",
+    "third_party/notices/nlohmann-json-v3.12.0-MIT.txt",
+    "third_party/notices/nlohmann-json-v3.9.1-MIT.txt",
+    "third_party/notices/o1heap-MIT.txt",
+    "third_party/notices/rabbitizer-MIT.txt",
+    "third_party/notices/RT64-ddspp-MIT.txt",
+    "third_party/notices/RT64-hlslpp.txt",
+    "third_party/notices/RT64-im3d.txt",
+    "third_party/notices/RT64-imgui.txt",
+    "third_party/notices/RT64-implot.txt",
+    "third_party/notices/RT64-MIT.txt",
+    "third_party/notices/RT64-nfd-zlib.txt",
+    "third_party/notices/RT64-plume-MIT.txt",
+    "third_party/notices/RT64-plume-VMA.txt",
+    "third_party/notices/RT64-plume-volk.txt",
+    "third_party/notices/RT64-plume-Vulkan-Headers.txt",
+    "third_party/notices/RT64-re-spirv-MIT.txt",
+    "third_party/notices/RT64-spirv-cross-Apache-2.0.txt",
+    "third_party/notices/RT64-spirv-headers.txt",
+    "third_party/notices/RT64-stb.txt",
+    "third_party/notices/RT64-utf8conv-MIT.txt",
+    "third_party/notices/RT64-xxHash-BSD.txt",
+    "third_party/notices/RT64-zstd-BSD.txt",
+    "third_party/notices/SDL-GameControllerDB.txt",
+    "third_party/notices/SIL-OFL-1.1.txt",
+    "third_party/notices/sljit-BSD.txt",
+    "third_party/notices/X-Scale-CIC-BSD.txt"
+  ],
+  "runtimeData": [
+    "config/tooie.us.toml",
+    "metadata/core1.json",
+    "metadata/core2.json",
+    "metadata/overlays.json"
+  ],
+  "bundledLibraryLicenses": {
+    "sdl2-compat": "LICENSE.txt",
+    "sdl3": "LICENSE.txt",
+    "openssl@3": "LICENSE.txt"
+  },
+  "sourceLicenses": {
+    "third_party/notices/bundled/metal-cpp-Apache-2.0.txt": "deps/rt64/src/contrib/plume/contrib/metal-cpp/LICENSE.txt"
+  }
+}

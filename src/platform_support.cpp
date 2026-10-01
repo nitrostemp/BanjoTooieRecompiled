@@ -153,6 +153,17 @@ std::filesystem::path executable_path() {
     }
 #endif
 }
+std::filesystem::path resource_directory(const std::filesystem::path& executable) {
+    const auto directory=std::filesystem::absolute(executable).parent_path();
+#ifdef __APPLE__
+    if (directory.filename()=="MacOS" && directory.parent_path().filename()=="Contents") {
+        const auto resources=directory.parent_path()/"Resources";
+        if (std::filesystem::is_directory(resources)) return resources;
+    }
+#endif
+    return directory;
+}
+std::filesystem::path resource_directory() { return resource_directory(executable_path()); }
 #ifdef _WIN32
 std::wstring frontend_command_line(const std::filesystem::path& executable,
     const std::filesystem::path& profile, FrontendLaunch mode) {

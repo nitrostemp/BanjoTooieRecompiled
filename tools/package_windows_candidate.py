@@ -80,8 +80,9 @@ def run(*command: str, cwd: Path = ROOT, timeout: int = 30) -> str:
 
 
 def metadata_identity(build: Path, expected_names: set[str], version: str,
-                      revision: str, state: str, allow_dirty: bool) -> str:
-    executable = build / "TooieRecompiled.exe"
+                      revision: str, state: str, allow_dirty: bool,
+                      executable_name: str = "TooieRecompiled.exe") -> str:
+    executable = build / executable_name
     report = json.loads(run(str(executable), "--build-metadata-info", timeout=30))
     if report.get("version") != version:
         raise ValueError("Executable version differs from candidate allowlist")
