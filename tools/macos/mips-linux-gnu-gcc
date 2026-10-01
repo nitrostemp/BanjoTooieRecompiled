@@ -1,0 +1,173 @@
+#!/usr/bin/env python3
+"""Assembler-only stand-in for mips-linux-gnu-gcc on macOS.
+
+The pinned decompilation uses `mips-linux-gnu-gcc ... -x assembler-with-cpp -c`
+purely as an assembler driver. Homebrew provides mips-linux-gnu binutils but no
+MIPS GCC, so this reproduces the GCC driver's assembler path: preprocess with
+Apple clang (GCC's MIPS predefines restored where clang differs), then run
+mips-linux-gnu-as with the options GCC's ASM_SPEC passes. Anything other than
+assembling is refused rather than approximated. The rebuilt ROM is still
+checked byte-for-byte against the user's ROM afterwards.
+"""
+
+from __future__ import annotations
+
+import os
+import re
+import shutil
+import subprocess
+import sys
+import tempfile
+
+
+def fail(message: str) -> int:
+    print(f"mips-linux-gnu-gcc (macOS shim): {message}", file=sys.stderr)
+    return 2
+
+
+def main(argv: list[str]) -> int:
+    cpp_args: list[str] = []
+    include_dirs: list[str] = []
+    as_extra: list[str] = []
+    inputs: list[str] = []
+    output = None
+    language = None
+    compile_only = False
+    isa = None
+    arch = None
+    abi = None
+    gp = None
+    fp = None
+    g_value = None
+    optimize = None
+    big_endian = True
+    i = 0
+    while i < len(argv):
+        arg = argv[i]
+
+        def value() -> str:
+            nonlocal i
+            i += 1
+            if i >= len(argv):
+                raise ValueError(f"{arg} needs a value")
+            return argv[i]
+
+        if arg == "-c":
+            compile_only = True
+        elif arg == "-o":
+            output = value()
+        elif arg == "-x":
+            language = value()
+        elif arg in ("-I", "-D", "-U", "-include"):
+            option_value = value()
+            cpp_args += [arg, option_value]
+            if arg == "-I":
+                include_dirs.append(option_value)
+        elif arg.startswith("-I"):
+            cpp_args.append(arg)
+            include_dirs.append(arg[2:])
+        elif arg.startswith(("-D", "-U")):
+            cpp_args.append(arg)
+        elif re.fullmatch(r"-mips[1-4]", arg):
+            isa = int(arg[5:])
+        elif arg.startswith("-march="):
+            arch = arg[len("-march="):]
+        elif arg.startswith("-mabi="):
+            abi = arg[len("-mabi="):]
+        elif arg in ("-mgp32", "-mgp64"):
+            gp = arg
+        elif arg in ("-mfp32", "-mfp64"):
+            fp = arg
+        elif arg == "-G":
+            g_value = value()
+        elif arg.startswith("-G"):
+            g_value = arg[2:]
+        elif arg in ("-EB", "-meb"):
+            big_endian = True
+        elif arg in ("-EL", "-mel"):
+            big_endian = False
+        elif arg.startswith("-O"):
+            optimize = arg
+        elif arg.startswith("-Wa,"):
+            as_extra += [part for part in arg[4:].split(",") if part]
+        elif arg in ("-mno-abicalls", "-fno-pic", "-fno-PIC", "-nostdinc") or arg.startswith(("-g", "-W")):
+            # No assembler-visible effect in GCC's MIPS ASM_SPEC with
+            # -mno-abicalls; debug info and warnings do not change code bytes.
+            pass
+        elif arg.startswith("-"):
+            raise ValueError(f"unsupported option {arg}")
+        else:
+            inputs.append(arg)
+        i += 1
+
+    if not compile_only or output is None or len(inputs) != 1:
+        raise ValueError("only `-c <input> -o <output>` assembly is supported")
+    source = inputs[0]
+    if language is None:
+        language = "assembler-with-cpp" if source.endswith(".S") else "assembler"
+    if language not in ("assembler", "assembler-with-cpp"):
+        raise ValueError(f"only assembler input is supported, not {language}")
+    if abi not in (None, "32"):
+        raise ValueError(f"only -mabi=32 is supported, not {abi}")
+    if isa is None:
+        isa = 3 if arch in ("vr4300", "mips3") else 1
+
+    assembler = shutil.which("mips-linux-gnu-as")
+    if assembler is None:
+        raise ValueError("mips-linux-gnu-as is not on PATH (brew install mips-linux-gnu-binutils)")
+
+    with tempfile.TemporaryDirectory(prefix="mips-as-") as temp:
+        assembly = source
+        if language == "assembler-with-cpp":
+            assembly = os.path.join(temp, "preprocessed.s")
+            preprocess = [
+                os.environ.get("TOOIE_MIPS_CPP_CLANG", "/usr/bin/clang"),
+                "-E", "-x", "assembler-with-cpp", "--target=mips-linux-gnu",
+                f"-march=mips{isa}", "-mabi=32", "-fno-pic",
+                "-mfp64" if fp == "-mfp64" else "-mfp32",
+                # Apple clang has no MIPS backend, so -mno-abicalls (which adds
+                # a backend -mllvm option) is expressed as its predefine only.
+                "-U__mips_abicalls",
+                # GCC's values for the ISA macros (clang derives them from the ABI).
+                "-U__mips", f"-D__mips={isa}",
+                "-U_MIPS_ISA", f"-D_MIPS_ISA=_MIPS_ISA_MIPS{isa}",
+                "-D_MIPS_ISA_MIPS1=1", "-D_MIPS_ISA_MIPS2=2",
+                "-D_MIPS_ISA_MIPS3=3", "-D_MIPS_ISA_MIPS4=4",
+                *cpp_args, source, "-o", assembly,
+            ]
+            completed = subprocess.run(preprocess)
+            if completed.returncode:
+                return completed.returncode
+        # GCC's MIPS ASM_SPEC: %{G*} endian %{mipsN} -O1 default, %{mabi} %{mgp*}
+        # %{march} %{mfp*}; GNU as also receives the -I directories.
+        if optimize == "-O0":
+            as_optimize = "-O1"
+        elif optimize is not None:
+            as_optimize = "-O2"
+        else:
+            as_optimize = "-O1"
+        command = [assembler]
+        if g_value is not None:
+            command.append(f"-G{g_value}")
+        command.append("-EB" if big_endian else "-EL")
+        command.append(f"-mips{isa}")
+        command.append(as_optimize)
+        command.append("-mabi=32")
+        if gp:
+            command.append(gp)
+        if arch:
+            command.append(f"-march={arch}")
+        if fp:
+            command.append(fp)
+        for directory in include_dirs:
+            command += ["-I", directory]
+        command += as_extra
+        command += ["-o", output, assembly]
+        return subprocess.run(command).returncode
+
+
+if __name__ == "__main__":
+    try:
+        raise SystemExit(main(sys.argv[1:]))
+    except ValueError as error:
+        raise SystemExit(fail(str(error)))

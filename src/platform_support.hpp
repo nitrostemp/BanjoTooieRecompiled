@@ -10,6 +10,10 @@ namespace tooie::platform {
 std::string digest(std::span<const uint8_t> bytes,bool sha256);
 std::string file_sha256(const std::filesystem::path& path);
 std::filesystem::path executable_path();
+// Directory holding assets/, runtime-data/ and recompcontrollerdb.txt: beside
+// the executable, or Contents/Resources when it runs inside a macOS app bundle.
+std::filesystem::path resource_directory(const std::filesystem::path& executable);
+std::filesystem::path resource_directory();
 enum class FrontendLaunch : std::uint8_t { RestartGame, Launcher, PracticeGame };
 #ifdef _WIN32
 // CreateProcessW command line; exposed for focused argument-quoting coverage.

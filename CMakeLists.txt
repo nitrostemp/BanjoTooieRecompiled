@@ -1,5 +1,13 @@
 cmake_minimum_required(VERSION 3.20)
 project(TooieRecompiled VERSION 0.1.0 LANGUAGES C CXX)
+if(APPLE)
+    # RT64/plume Apple sources and ImGui's Metal renderer are Objective-C++.
+    enable_language(OBJC OBJCXX)
+    # RT64 selects hlsl++'s scalar path on Apple Silicon, which calls labs()
+    # without including <stdlib.h>; current macOS SDKs no longer provide it
+    # transitively. Keep the RT64 pin unmodified and supply the header.
+    add_compile_options("$<$<COMPILE_LANGUAGE:CXX,OBJCXX>:SHELL:-include stdlib.h>")
+endif()
 set(CMAKE_C_STANDARD 17)
 set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
@@ -18,6 +26,10 @@ if(WIN32 AND CMAKE_CXX_COMPILER_ID STREQUAL "Clang")
         "$<$<OR:$<CONFIG:Release>,$<CONFIG:RelWithDebInfo>,$<CONFIG:MinSizeRel>>:/clang:-ffile-prefix-map=${CMAKE_CURRENT_SOURCE_DIR}=/src>"
         "$<$<OR:$<CONFIG:Release>,$<CONFIG:RelWithDebInfo>,$<CONFIG:MinSizeRel>>:/clang:-ffile-prefix-map=${CMAKE_BINARY_DIR}=/build>"
         "$<$<OR:$<CONFIG:Release>,$<CONFIG:RelWithDebInfo>,$<CONFIG:MinSizeRel>>:/clang:-fdebug-compilation-dir=/build>")
+elseif(APPLE)
+    add_compile_options(
+        "$<$<OR:$<CONFIG:Release>,$<CONFIG:RelWithDebInfo>,$<CONFIG:MinSizeRel>>:-ffile-prefix-map=${CMAKE_CURRENT_SOURCE_DIR}=/src>"
+        "$<$<OR:$<CONFIG:Release>,$<CONFIG:RelWithDebInfo>,$<CONFIG:MinSizeRel>>:-ffile-prefix-map=${CMAKE_BINARY_DIR}=/build>")
 elseif(WIN32 AND CMAKE_CXX_COMPILER_ID STREQUAL "MSVC")
     add_compile_options(
         "$<$<OR:$<CONFIG:Release>,$<CONFIG:RelWithDebInfo>,$<CONFIG:MinSizeRel>>:/pathmap:${CMAKE_CURRENT_SOURCE_DIR}=/src>"
@@ -182,10 +194,6 @@ else()
     target_link_options(TooieRecompiled PRIVATE "-Wl,-Map,${CMAKE_BINARY_DIR}/TooieRecompiled.map")
 endif()
 if(TOOIE_NATIVE_HOST)
-    if(APPLE)
-        message(FATAL_ERROR
-            "The native ImGui frontend requires RT64's Vulkan or D3D12 Inspector backend; the macOS Metal backend is not supported yet.")
-    endif()
     include(cmake/NativeHost.cmake)
     target_sources(TooieFoundation PRIVATE src/frontend_diagnostics.cpp src/frontend_diagnostics_overlay.cpp src/frontend_session_log.cpp src/frontend_prompt.cpp src/pacing_render_work.cpp src/practice_travel.cpp src/practice_forms.cpp)
     if(WIN32)
@@ -453,7 +461,11 @@ add_executable(boot_entry_test tests/boot_entry_test.cpp)
 target_link_libraries(boot_entry_test PRIVATE TooieFoundation)
 add_executable(diagnostic_failure_test tests/diagnostic_failure_test.cpp)
 target_link_libraries(diagnostic_failure_test PRIVATE TooieFoundation)
-if(NOT MSVC)
+if(APPLE)
+    foreach(target TooieRecompiled registration_test boot_entry_test diagnostic_failure_test)
+        target_link_options(${target} PRIVATE -Wl,-dead_strip)
+    endforeach()
+elseif(NOT MSVC)
     foreach(target TooieRecompiled registration_test boot_entry_test diagnostic_failure_test)
         target_link_options(${target} PRIVATE -Wl,--gc-sections)
     endforeach()

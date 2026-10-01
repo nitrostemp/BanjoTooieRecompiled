@@ -299,6 +299,82 @@ target_include_directories(TooieFoundation PRIVATE
     "${TOOIE_RT64_ROOT}/src" "${TOOIE_RT64_ROOT}/src/imgui" "${TOOIE_RT64_ROOT}/src/contrib"
     "${TOOIE_RT64_ROOT}/src/contrib/hlslpp/include" "${TOOIE_RT64_ROOT}/src/contrib/xxHash"
     "${TOOIE_RT64_ROOT}/src/contrib/dxc/inc" "${TOOIE_RT64_ROOT}/src/contrib/plume")
+if(APPLE)
+    # RT64's Inspector has no Metal ImGui renderer, so the player menu uses
+    # the pinned ImGui's own Metal backend through its metal-cpp interface.
+    set(_imgui_metal_backend "${TOOIE_RT64_ROOT}/src/contrib/imgui/backends/imgui_impl_metal.mm")
+    target_sources(TooieFoundation PRIVATE src/imgui_backend_metal.cpp "${_imgui_metal_backend}")
+    set_source_files_properties("${_imgui_metal_backend}" src/imgui_backend_metal.cpp PROPERTIES
+        INCLUDE_DIRECTORIES "${TOOIE_RT64_ROOT}/src/contrib/imgui")
+    set_source_files_properties("${_imgui_metal_backend}" PROPERTIES
+        COMPILE_OPTIONS "-fobjc-arc"
+        COMPILE_DEFINITIONS IMGUI_IMPL_METAL_CPP)
+    target_include_directories(TooieFoundation PRIVATE
+        "${TOOIE_RT64_ROOT}/src/contrib/plume/contrib/metal-cpp")
+    target_link_libraries(TooieFoundation PUBLIC
+        "-framework Foundation" "-framework Metal" "-framework QuartzCore")
+
+    # Pinned plume's CocoaWindow queues main-queue blocks that dereference the
+    # CocoaWindow and its NSWindow. Blocks still queued when the swap chain and
+    # window are destroyed ran during SDL_Quit and crashed on the freed window.
+    # Keep the pin immutable: blocks in this overlay act only on live windows.
+    set(_plume_apple_input "${TOOIE_RT64_ROOT}/src/contrib/plume/plume_apple.mm")
+    set(_plume_apple_overlay "${CMAKE_CURRENT_BINARY_DIR}/tooie_rt64_overlay/plume_apple.mm")
+    file(SHA256 "${_plume_apple_input}" _plume_apple_hash)
+    if(NOT _plume_apple_hash STREQUAL "fd78014d34195589b53ba6b1c005a8a6f07852322593e7a9f152452a54b72cda")
+        message(FATAL_ERROR "Pinned plume CocoaWindow source changed; review the window lifetime overlay")
+    endif()
+    file(READ "${_plume_apple_input}" _plume_apple_source)
+    set(_plume_live_check "std::lock_guard<std::mutex> live(plumeLiveWindowsMutex);\n            if (plumeLiveWindows.count(this) == 0) return;\n            ")
+    foreach(_seam_pair
+            "#import <IOKit/IOKitLib.h>\n|#import <IOKit/IOKitLib.h>\n\n#include <mutex>\n#include <unordered_set>\n\n// Main-queue blocks act only on CocoaWindows that still exist.\nstatic std::mutex plumeLiveWindowsMutex;\nstatic std::unordered_set<const void*> plumeLiveWindows;\n"
+            "        : windowHandle(window), cachedRefreshRate(0) {\n|        : windowHandle(window), cachedRefreshRate(0) {\n        {\n            std::lock_guard<std::mutex> live(plumeLiveWindowsMutex);\n            plumeLiveWindows.insert(this);\n        }\n"
+            "    CocoaWindow::~CocoaWindow() {}|    CocoaWindow::~CocoaWindow() {\n        std::lock_guard<std::mutex> live(plumeLiveWindowsMutex);\n        plumeLiveWindows.erase(this);\n    }"
+            "            dispatch_async(dispatch_get_main_queue(), ^{\n                NSWindow *nsWindow = (__bridge NSWindow *)windowHandle;|            dispatch_async(dispatch_get_main_queue(), ^{\n                std::lock_guard<std::mutex> live(plumeLiveWindowsMutex);\n                if (plumeLiveWindows.count(this) == 0) return;\n                NSWindow *nsWindow = (__bridge NSWindow *)windowHandle;")
+        string(FIND "${_seam_pair}" "|" _seam_split)
+        string(SUBSTRING "${_seam_pair}" 0 ${_seam_split} _seam)
+        math(EXPR _seam_split "${_seam_split}+1")
+        string(SUBSTRING "${_seam_pair}" ${_seam_split} -1 _seam_patch)
+        string(FIND "${_plume_apple_source}" "${_seam}" _seam_at)
+        string(FIND "${_plume_apple_source}" "${_seam}" _seam_last REVERSE)
+        if(_seam_at LESS 0 OR NOT _seam_at EQUAL _seam_last)
+            message(FATAL_ERROR "Pinned plume CocoaWindow seam drifted: ${_seam}")
+        endif()
+        string(REPLACE "${_seam}" "${_seam_patch}" _plume_apple_source "${_plume_apple_source}")
+    endforeach()
+    # Both attribute and refresh-rate update blocks start with this seam.
+    set(_plume_update_seam "auto updateBlock = ^{\n            NSWindow *nsWindow")
+    string(REPLACE "${_plume_update_seam}" "" _plume_update_probe "${_plume_apple_source}")
+    string(LENGTH "${_plume_apple_source}" _plume_before)
+    string(LENGTH "${_plume_update_probe}" _plume_after)
+    string(LENGTH "${_plume_update_seam}" _plume_seam_length)
+    math(EXPR _plume_update_count "(${_plume_before}-${_plume_after})/${_plume_seam_length}")
+    if(NOT _plume_update_count EQUAL 2)
+        message(FATAL_ERROR "Expected two pinned plume update blocks; got ${_plume_update_count}")
+    endif()
+    string(REPLACE "${_plume_update_seam}"
+        "auto updateBlock = ^{\n            ${_plume_live_check}NSWindow *nsWindow"
+        _plume_apple_source "${_plume_apple_source}")
+    file(WRITE "${_plume_apple_overlay}" "${_plume_apple_source}")
+    set_property(DIRECTORY APPEND PROPERTY CMAKE_CONFIGURE_DEPENDS "${_plume_apple_input}")
+    get_target_property(_plume_sources plume SOURCES)
+    get_target_property(_plume_source_dir plume SOURCE_DIR)
+    set(_plume_new_sources)
+    set(_plume_apple_replaced 0)
+    foreach(_source IN LISTS _plume_sources)
+        get_filename_component(_absolute "${_source}" ABSOLUTE BASE_DIR "${_plume_source_dir}")
+        if(_absolute STREQUAL _plume_apple_input)
+            list(APPEND _plume_new_sources "${_plume_apple_overlay}")
+            math(EXPR _plume_apple_replaced "${_plume_apple_replaced}+1")
+        else()
+            list(APPEND _plume_new_sources "${_source}")
+        endif()
+    endforeach()
+    if(NOT _plume_apple_replaced EQUAL 1)
+        message(FATAL_ERROR "Expected one pinned plume Apple source; got ${_plume_apple_replaced}")
+    endif()
+    set_property(TARGET plume PROPERTY SOURCES "${_plume_new_sources}")
+endif()
 
 # CPU-only checks of the real pinned renderer paths; no window or profile.
 add_executable(graphics_branch_capture_test tests/graphics_branch_capture_test.cpp)

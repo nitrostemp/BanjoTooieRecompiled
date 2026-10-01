@@ -1,6 +1,7 @@
 #include "core1_bridge.hpp"
 #include "core1_metadata.hpp"
 #include <cfenv>
+#include <initializer_list>
 #include <stdexcept>
 
 namespace {

@@ -24,7 +24,7 @@ std::string_view expected_hash(File file){return detail::files.at(static_cast<un
 std::string_view relative_path(File file){return detail::files.at(static_cast<unsigned>(file)).path;}
 Bundle Bundle::load_for_executable(const std::filesystem::path& executable) {
     Bundle result;
-    auto sibling=std::filesystem::absolute(executable).parent_path()/"runtime-data"/detail::identity;
+    auto sibling=platform::resource_directory(executable)/"runtime-data"/detail::identity;
     // symlink_status also detects a dangling link; an invalid selected sibling
     // must fail closed, rather than being treated as absent.
     const auto status=std::filesystem::symlink_status(sibling);

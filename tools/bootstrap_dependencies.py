@@ -196,7 +196,8 @@ def install_archive(name: str, spec: dict[str, object], deps: pathlib.Path,
 def platform_matches(spec: dict[str, object]) -> bool:
     wanted = spec.get("platform")
     return wanted is None or (wanted == "windows" and os.name == "nt") or (
-        wanted == "linux" and sys.platform.startswith("linux"))
+        wanted == "linux" and sys.platform.startswith("linux")) or (
+        wanted == "macos" and sys.platform == "darwin")
 
 
 def main() -> int:
