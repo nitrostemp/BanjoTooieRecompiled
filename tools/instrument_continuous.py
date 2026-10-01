@@ -1010,7 +1010,8 @@ def apply_guest_update_observer(text, source='<generated>'):
     if not matches:return text,0
     if len(matches)!=1:raise ValueError(f'{source}: duplicate guest-update owner')
     body=matches[0][0]
-    hook='    tooie_guest_update_observed(MEM_H(0X80127634, 0) != 0);\n'
+    # Absolute guest addresses must be sign-extended like guest registers.
+    hook='    tooie_guest_update_observed(MEM_H(0, (gpr)(int32_t)0x80127634U) != 0);\n'
     if hook in body:raise ValueError(f'{source}: guest-update observer already present')
     entry='RECOMP_FUNC void func_800A73F4(uint8_t* rdram, recomp_context* ctx) {\n'
     variables='    uint64_t hi = 0, lo = 0, result = 0;\n'
